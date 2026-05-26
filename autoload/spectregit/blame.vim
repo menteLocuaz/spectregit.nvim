@@ -285,6 +285,33 @@ function! spectregit#blame#FileType() abort
 endfunction
 
 function! spectregit#blame#Subcommand(line1, count, range, bang, mods, options) abort
-  " To be implemented, but needs more research into fugitive#Subcommand logic
-  return 'echoerr "spectregit#blame#Subcommand not yet implemented"'
+  let git_dir = spectregit#core#Dir()
+  if empty(git_dir)
+    return 'echoerr "fugitive: working directory does not belong to a Git repository"'
+  endif
+
+  let subcommand_args = get(a:options, 'subcommand_args', [])
+  let blame_args = ['blame'] + subcommand_args
+  let git_cmd = [git_dir] + blame_args
+
+  let result = spectregit#git#Execute(git_cmd)
+  
+  if result.exit_status != 0
+    return 'echoerr "fugitive: blame failed: ' . join(result.stderr, "\n") . '"'
+  endif
+
+  let bufnr = bufnr('')
+  let winid = win_getid()
+  let title = 'blame ' . join(subcommand_args, ' ')
+  
+  let mods = spectregit#core#Mods(a:mods)
+  execute mods . 'edit fugitive://' . fugitive#UrlDecode(git_dir) . '//' . title
+  setlocal buftype=nofile bufhidden=wipe noswapfile filetype=fugitiveblame
+  call setline(1, result.stdout)
+  setlocal nomodifiable
+  
+  let b:git_dir = git_dir
+  let b:fugitive_type = 'blame'
+  
+  return ''
 endfunction
