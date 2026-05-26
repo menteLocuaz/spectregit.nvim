@@ -113,3 +113,32 @@ function! spectregit#path#Path(url, ...) abort
   endif
   return spectregit#core#Slash(spectregit#path#Real(a:url))
 endfunction
+
+function! spectregit#path#UrlEncode(str) abort
+  return substitute(a:str, '[%#?[:cntrl:]]', '\=printf("%%%02X", char2nr(submatch(0)))', 'g')
+endfunction
+
+function! spectregit#path#DirUrlPrefix(dir) abort
+  let gd = spectregit#core#Dir(a:dir)
+  return 'fugitive://' . (gd =~# '^[^/]' ? '/' : '') . spectregit#path#UrlEncode(gd) . '//'
+endfunction
+
+function! spectregit#path#Generate(object, ...) abort
+  let dir = a:0 ? a:1 : spectregit#core#Dir()
+  let f = fugitive#Find(a:object, dir)
+  if !empty(f)
+    return f
+  elseif a:object ==# ':/'
+    return len(dir) ? spectregit#core#VimSlash(spectregit#path#DirUrlPrefix(dir) . '0') : '.'
+  endif
+  let file = matchstr(a:object, '^\%(:\d:\|[^:]*:\)\=\zs.*')
+  return empty(file) ? '' : fnamemodify(spectregit#core#VimSlash(file), ':p')
+endfunction
+
+function! spectregit#path#Join(prefix, str) abort
+  if a:prefix =~# '://'
+    return a:prefix . spectregit#path#UrlEncode(a:str)
+  else
+    return a:prefix . a:str
+  endif
+endfunction

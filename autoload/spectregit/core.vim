@@ -31,8 +31,17 @@ function! spectregit#core#fnameescape(file) abort
   endif
 endfunction
 
+" INTERNAL entry point used by the FugitiveGitDir() guard to prevent recursion.
+function! spectregit#core#GitDirRaw(...) abort
+  return call(g:Orig_FugitiveGitDir, a:000)
+endfunction
+
+" PUBLIC entry point used by all spectregit#* modules.
 function! spectregit#core#Dir(...) abort
-  return call('FugitiveGitDir', a:000)
+  if exists('g:spectregit_test_mock_dir')
+    return g:spectregit_test_mock_dir
+  endif
+  return call('spectregit#core#GitDirRaw', a:000)
 endfunction
 
 function! spectregit#core#Tree(...) abort
@@ -197,6 +206,121 @@ function! spectregit#core#DirCommitFile(path) abort
     return ['', '', '']
   endif
   return [spectregit#core#Dir(fugitive#UrlDecode(vals[1])), vals[2], empty(vals[2]) ? '/.git/index' : fugitive#UrlDecode(vals[3])]
+endfunction
+
+function! spectregit#core#ArgSplit(string) abort
+  let string = a:string
+  let args = []
+  while string =~# '\S'
+    let arg = matchstr(string, '^\s*\%(\\.\|\S\)\+')
+    let string = strpart(string, len(arg))
+    let arg = substitute(arg, '^\s\+', '', '')
+    call add(args, substitute(arg, '\\\+[|" ]', '\=submatch(0)[len(submatch(0))/2 : -1]', 'g'))
+  endwhile
+  return args
+endfunction
+
+function! spectregit#core#TreeChomp(...) abort
+  let r = call('fugitive#Execute', a:000)
+  if !r.exit_status
+    return spectregit#core#JoinChomp(r.stdout)
+  endif
+  throw 'fugitive: error running `' . call('fugitive#ShellCommand', a:000) . '`: ' . spectregit#core#JoinChomp(r.stderr)
+endfunction
+
+function! spectregit#core#AbsoluteVimPath(...) abort
+  if a:0 && type(a:1) == type('')
+    let path = a:1
+  else
+    let path = bufname(a:0 && a:1 > 0 ? a:1 : '')
+    if getbufvar(a:0 && a:1 > 0 ? a:1 : '', '&buftype') !~# '^\%(nowrite\|acwrite\)\=$'
+      return path
+    endif
+  endif
+  if spectregit#core#Slash(path) =~# '^/\|^\a\+:'
+    return path
+  else
+    let sep = matchstr(getcwd(), '[\\/]')
+    if empty(sep)
+      let sep = '/'
+    endif
+    return getcwd() . sep . path
+  endif
+endfunction
+
+function! spectregit#core#Resolve(path) abort
+  let path = resolve(a:path)
+  if has('win32')
+    let path = spectregit#core#VimSlash(fnamemodify(fnamemodify(path, ':h'), ':p') . fnamemodify(path, ':t'))
+  endif
+  return path
+endfunction
+
+if !exists('s:temp_files')
+  let s:temp_files = {}
+endif
+
+function! spectregit#core#TempState(...) abort
+  return get(s:temp_files, spectregit#core#cpath(spectregit#core#AbsoluteVimPath(a:0 ? a:1 : -1)), {})
+endfunction
+
+function! spectregit#core#RunSave(state) abort
+  let s:temp_files[spectregit#core#cpath(a:state.file)] = a:state
+endfunction
+
+function! spectregit#core#TempDelete(file) abort
+  let key = spectregit#core#cpath(spectregit#core#AbsoluteVimPath(a:file))
+  if has_key(s:temp_files, key) && !has_key(s:temp_files[key], 'job') && key !=# spectregit#core#cpath(get(get(g:, '_fugitive_last_job', {}), 'file', ''))
+    call delete(a:file)
+    call remove(s:temp_files, key)
+  endif
+  return ''
+endfunction
+
+function! spectregit#core#DoAutocmdChanged(dir) abort
+  let dir = a:dir is# -2 ? '' : FugitiveGitDir(a:dir)
+  if empty(dir) || !exists('#User#FugitiveChanged') || exists('g:fugitive_event')
+    return ''
+  endif
+  try
+    let g:fugitive_event = dir
+    if type(a:dir) == type({}) && has_key(a:dir, 'args') && has_key(a:dir, 'exit_status')
+      let g:fugitive_result = a:dir
+    endif
+    exe spectregit#core#DoAutocmd('User FugitiveChanged')
+  finally
+    unlet! g:fugitive_event g:fugitive_result
+    if dir isnot# FugitiveGitDir()
+      let g:fugitive_event = FugitiveGitDir()
+    endif
+  endtry
+  return ''
+endfunction
+
+function! spectregit#core#HasOpt(args, ...) abort
+  let args = a:args[0 : index(a:args, '--')]
+  let opts = copy(a:000)
+  if type(opts[0]) == type([])
+    if empty(args) || index(opts[0], args[0]) == -1
+      return 0
+    endif
+    call remove(opts, 0)
+  endif
+  for opt in opts
+    if index(args, opt) != -1
+      return 1
+    endif
+  endfor
+endfunction
+
+function! spectregit#core#LineChars(pattern) abort
+  let chars = strlen(spectregit#core#gsub(matchstr(getline('.'), a:pattern), '.', '.'))
+  if &conceallevel > 1
+    for col in range(1, chars)
+      let chars -= synconcealed(line('.'), col)[0]
+    endfor
+  endif
+  return chars
 endfunction
 
 function! spectregit#core#UsableWin(nr) abort

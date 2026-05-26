@@ -131,6 +131,16 @@ function! spectregit#git#Head(...) abort
   endif
 endfunction
 
+let s:merge_heads = ['MERGE_HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD']
+function! spectregit#git#CompleteHeads(dir) abort
+  if empty(a:dir)
+    return []
+  endif
+  let dir = FugitiveFind('.git/', a:dir)
+  return sort(filter(['HEAD', 'FETCH_HEAD', 'ORIG_HEAD'] + s:merge_heads, 'filereadable(dir . v:val)')) +
+        \ sort(spectregit#core#LinesError([a:dir, 'rev-parse', '--symbolic', '--branches', '--tags', '--remotes'])[0])
+endfunction
+
 function! spectregit#git#RevParse(rev, ...) abort
   let hash = spectregit#core#ChompDefault('', [a:0 ? a:1 : spectregit#core#Dir(), 'rev-parse', '--verify', a:rev, '--'])
   if hash =~# '^\x\{40,\}$'

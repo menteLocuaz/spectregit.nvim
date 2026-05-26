@@ -1,61 +1,61 @@
 # fugitive.vim
 
-Fugitive is the premier Vim plugin for Git.  Or maybe it's the premier Git
-plugin for Vim?  Either way, it's "so awesome, it should be illegal".  That's
+Fugitive is the premier Vim plugin for Git. Or maybe it's the premier Git
+plugin for Vim? Either way, it's "so awesome, it should be illegal". That's
 why it's called Fugitive.
 
 The crown jewel of Fugitive is `:Git` (or just `:G`), which calls any
-arbitrary Git command.  If you know how to use Git at the command line, you
-know how to use `:Git`.  It's vaguely akin to `:!git` but with numerous
+arbitrary Git command. If you know how to use Git at the command line, you
+know how to use `:Git`. It's vaguely akin to `:!git` but with numerous
 improvements:
 
-* The default behavior is to directly echo the command's output.  Quiet
+- The default behavior is to directly echo the command's output. Quiet
   commands like `:Git add` avoid the dreaded "Press ENTER or type command to
   continue" prompt.
-* `:Git commit`, `:Git rebase -i`, and other commands that invoke an editor do
+- `:Git commit`, `:Git rebase -i`, and other commands that invoke an editor do
   their editing in the current Vim instance.
-* `:Git diff`, `:Git log`, and other verbose, paginated commands have their
-  output loaded into a temporary buffer.  Force this behavior for any command
+- `:Git diff`, `:Git log`, and other verbose, paginated commands have their
+  output loaded into a temporary buffer. Force this behavior for any command
   with `:Git --paginate` or `:Git -p`.
-* `:Git blame` uses a temporary buffer with maps for additional triage.  Press
+- `:Git blame` uses a temporary buffer with maps for additional triage. Press
   enter on a line to view the commit where the line changed, or `g?` to see
-  other available maps.  Omit the filename argument and the currently edited
+  other available maps. Omit the filename argument and the currently edited
   file will be blamed in a vertical, scroll-bound split.
-* `:Git mergetool` and `:Git difftool` load their changesets into the quickfix
+- `:Git mergetool` and `:Git difftool` load their changesets into the quickfix
   list.
-* Called with no arguments, `:Git` opens a summary window with dirty files and
-  unpushed and unpulled commits.  Press `g?` to bring up a list of maps for
+- Called with no arguments, `:Git` opens a summary window with dirty files and
+  unpushed and unpulled commits. Press `g?` to bring up a list of maps for
   numerous operations including diffing, staging, committing, rebasing, and
-  stashing.  (This is the successor to the old `:Gstatus`.)
-* This command (along with all other commands) always uses the current
+  stashing. (This is the successor to the old `:Gstatus`.)
+- This command (along with all other commands) always uses the current
   buffer's repository, so you don't need to worry about the current working
   directory.
 
 Additional commands are provided for higher level operations:
 
-* View any blob, tree, commit, or tag in the repository with `:Gedit` (and
-  `:Gsplit`, etc.).  For example, `:Gedit HEAD~3:%` loads the current file as
+- View any blob, tree, commit, or tag in the repository with `:Gedit` (and
+  `:Gsplit`, etc.). For example, `:Gedit HEAD~3:%` loads the current file as
   it existed 3 commits ago.
-* `:Gdiffsplit` (or `:Gvdiffsplit`) brings up the staged version of the file
-  side by side with the working tree version.  Use Vim's diff handling
+- `:Gdiffsplit` (or `:Gvdiffsplit`) brings up the staged version of the file
+  side by side with the working tree version. Use Vim's diff handling
   capabilities to apply changes to the staged version, and write that buffer
-  to stage the changes.  You can also give an arbitrary `:Gedit` argument to
+  to stage the changes. You can also give an arbitrary `:Gedit` argument to
   diff against older versions of the file.
-* `:Gread` is a variant of `git checkout -- filename` that operates on the
-  buffer rather than the file itself.  This means you can use `u` to undo it
+- `:Gread` is a variant of `git checkout -- filename` that operates on the
+  buffer rather than the file itself. This means you can use `u` to undo it
   and you never get any warnings about the file changing outside Vim.
-* `:Gwrite` writes to both the work tree and index versions of a file, making
+- `:Gwrite` writes to both the work tree and index versions of a file, making
   it like `git add` when called from a work tree file and like `git checkout`
   when called from the index or a blob in history.
-* `:Ggrep` is `:grep` for `git grep`.  `:Glgrep` is `:lgrep` for the same.
-* `:GMove` does a `git mv` on the current file and changes the buffer name to
-  match.  `:GRename` does the same with a destination filename relative to the
+- `:Ggrep` is `:grep` for `git grep`. `:Glgrep` is `:lgrep` for the same.
+- `:GMove` does a `git mv` on the current file and changes the buffer name to
+  match. `:GRename` does the same with a destination filename relative to the
   current file's directory.
-* `:GDelete` does a `git rm` on the current file and simultaneously deletes
-  the buffer.  `:GRemove` does the same but leaves the (now empty) buffer
+- `:GDelete` does a `git rm` on the current file and simultaneously deletes
+  the buffer. `:GRemove` does the same but leaves the (now empty) buffer
   open.
-* `:GBrowse` to open the current file on the web front-end of your favorite
-  hosting provider, with optional line range (try it in visual mode).  Plugins
+- `:GBrowse` to open the current file on the web front-end of your favorite
+  hosting provider, with optional line range (try it in visual mode). Plugins
   are available for popular providers such as [GitHub][rhubarb.vim],
   [GitLab][fugitive-gitlab.vim], [Bitbucket][fubitive.vim],
   [Gitee][fugitive-gitee.vim], [Pagure][pagure],
@@ -78,11 +78,11 @@ For more information, see `:help fugitive`.
 
 ## Screencasts
 
-* [A complement to command line git](http://vimcasts.org/e/31)
-* [Working with the git index](http://vimcasts.org/e/32)
-* [Resolving merge conflicts with vimdiff](http://vimcasts.org/e/33)
-* [Browsing the git object database](http://vimcasts.org/e/34)
-* [Exploring the history of a git repository](http://vimcasts.org/e/35)
+- [A complement to command line git](http://vimcasts.org/e/31)
+- [Working with the git index](http://vimcasts.org/e/32)
+- [Resolving merge conflicts with vimdiff](http://vimcasts.org/e/33)
+- [Browsing the git object database](http://vimcasts.org/e/34)
+- [Exploring the history of a git repository](http://vimcasts.org/e/35)
 
 ## Installation
 
@@ -100,7 +100,7 @@ support:
 > `:Gfetch`?
 
 This behavior was divisive, confusing, and complicated inputting passwords, so
-it was removed.  Use `:Git! push` to use Fugitive's own asynchronous
+it was removed. Use `:Git! push` to use Fugitive's own asynchronous
 execution, or retroactively make `:Git push` asynchronous by pressing
 `CTRL-D`.
 
@@ -117,8 +117,8 @@ without it.
 
 > So I have a symlink and...
 
-Stop.  Just stop.  If Git won't deal with your symlink, then Fugitive won't
-either.  Consider using a [plugin that resolves
+Stop. Just stop. If Git won't deal with your symlink, then Fugitive won't
+either. Consider using a [plugin that resolves
 symlinks](https://github.com/aymericbeaumet/symlink.vim), or even better,
 using fewer symlinks.
 
@@ -126,12 +126,29 @@ using fewer symlinks.
 
 Like fugitive.vim? Follow the repository on
 [GitHub](https://github.com/tpope/vim-fugitive) and vote for it on
-[vim.org](http://www.vim.org/scripts/script.php?script_id=2975).  And if
+[vim.org](http://www.vim.org/scripts/script.php?script_id=2975). And if
 you're feeling especially charitable, follow [tpope](http://tpo.pe/) on
 [Twitter](http://twitter.com/tpope) and
 [GitHub](https://github.com/tpope).
 
+## Testing
+
+This project uses [vim-themis](https://github.com/thinca/vim-themis) for testing.
+
+### Running Tests
+
+To run the full test suite, execute:
+
+```bash
+themis test/
+```
+
+The test suite verifies:
+- **Decoupling**: Successful interception of Fugitive functions and commands.
+- **Modularity**: Integrity of new `spectregit#*` modules.
+- **Strangler Fig Invariant**: Ensures `autoload/fugitive.vim` remains untouched via SHA256 checksum verification.
+
 ## License
 
-Copyright (c) Tim Pope.  Distributed under the same terms as Vim itself.
+Copyright (c) Tim Pope. Distributed under the same terms as Vim itself.
 See `:help license`.

@@ -1,0 +1,3 @@
+[themis]
+target = "test"
+recursive = 1
