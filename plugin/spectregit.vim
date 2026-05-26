@@ -3,157 +3,64 @@ let g:loaded_spectregit = 1
 
 if !exists('g:loaded_fugitive') | finish | endif
 
+" Fugitive script context replicas — needed by body-extracted originals
+let s:bad_git_dir = '/$\|^fugitive:'
+function! s:Slash(path) abort
+  return spectregit#core#Slash(a:path)
+endfunction
+
+" Extract function source as Vimscript from :function output.
+" Always adds ! to support redefinition via execute().
+function! s:ExtractFunctionSource(name) abort
+  redir => raw
+    silent execute 'function ' . a:name
+  redir END
+  let lines = split(raw, "\n")
+  if empty(lines)
+    return ''
+  endif
+  let first = substitute(lines[0], '^\s*', '', '')
+  if first !~# '^function!'
+    let first = substitute(first, '^function', 'function!', '')
+  endif
+  let rest = []
+  for i in range(1, len(lines) - 1)
+    call add(rest, substitute(lines[i], '^\s*\d\+\s*', '', ''))
+  endfor
+  return first . "\n" . join(rest, "\n")
+endfunction
+
+" Save original function under a permanent s:Orig_<safe> name
+" in this script's context. Returns the saved function name (with s: prefix),
+" or empty string on failure.
+function! s:SaveOriginalFunction(name) abort
+  let safe = substitute(a:name, '[^A-Za-z0-9_]', '_', 'g')
+  let saved = 's:Orig_' . safe
+  if exists('*' . substitute(saved, ':', '#', ''))
+    return saved
+  endif
+  let src = s:ExtractFunctionSource(a:name)
+  if empty(src)
+    return ''
+  endif
+  let lines = split(src, "\n")
+  let name_esc = escape(a:name, '~.*^$[\&/')
+  let lines[0] = substitute(lines[0], '\Cfunction!\s\+' . name_esc . '\ze\s*(',
+        \ 'function! ' . saved, '')
+  execute join(lines, "\n")
+  return saved
+endfunction
+
 function! s:CaptureFugitiveOriginals() abort
   if !exists('g:loaded_fugitive') | return | endif
-  if exists('*FugitiveGitDir') && !exists('s:orig_FugitiveGitDir')
-    let s:orig_FugitiveGitDir = function('FugitiveGitDir')
+
+  if exists('*FugitiveGitDir') && !exists('g:Orig_FugitiveGitDir')
+    call s:SaveOriginalFunction('FugitiveGitDir')
+    let g:Orig_FugitiveGitDir = function('s:Orig_FugitiveGitDir')
   endif
-  if exists('*FugitiveReal') && !exists('s:orig_FugitiveReal')
-    let s:orig_FugitiveReal = function('FugitiveReal')
-  endif
-  if exists('*FugitiveFind') && !exists('s:orig_FugitiveFind')
-    let s:orig_FugitiveFind = function('FugitiveFind')
-  endif
-  if exists('*FugitiveParse') && !exists('s:orig_FugitiveParse')
-    let s:orig_FugitiveParse = function('FugitiveParse')
-  endif
-  if exists('*FugitiveGitVersion') && !exists('s:orig_FugitiveGitVersion')
-    let s:orig_FugitiveGitVersion = function('FugitiveGitVersion')
-  endif
-  if exists('*FugitiveResult') && !exists('s:orig_FugitiveResult')
-    let s:orig_FugitiveResult = function('FugitiveResult')
-  endif
-  if exists('*FugitiveExecute') && !exists('s:orig_FugitiveExecute')
-    let s:orig_FugitiveExecute = function('FugitiveExecute')
-  endif
-  if exists('*FugitiveShellCommand') && !exists('s:orig_FugitiveShellCommand')
-    let s:orig_FugitiveShellCommand = function('FugitiveShellCommand')
-  endif
-  if exists('*FugitiveConfig') && !exists('s:orig_FugitiveConfig')
-    let s:orig_FugitiveConfig = function('FugitiveConfig')
-  endif
-  if exists('*FugitiveConfigGet') && !exists('s:orig_FugitiveConfigGet')
-    let s:orig_FugitiveConfigGet = function('FugitiveConfigGet')
-  endif
-  if exists('*FugitiveConfigGetAll') && !exists('s:orig_FugitiveConfigGetAll')
-    let s:orig_FugitiveConfigGetAll = function('FugitiveConfigGetAll')
-  endif
-  if exists('*FugitiveConfigGetRegexp') && !exists('s:orig_FugitiveConfigGetRegexp')
-    let s:orig_FugitiveConfigGetRegexp = function('FugitiveConfigGetRegexp')
-  endif
-  if exists('*FugitiveRemoteUrl') && !exists('s:orig_FugitiveRemoteUrl')
-    let s:orig_FugitiveRemoteUrl = function('FugitiveRemoteUrl')
-  endif
-  if exists('*FugitiveRemote') && !exists('s:orig_FugitiveRemote')
-    let s:orig_FugitiveRemote = function('FugitiveRemote')
-  endif
-  if exists('*FugitiveDidChange') && !exists('s:orig_FugitiveDidChange')
-    let s:orig_FugitiveDidChange = function('FugitiveDidChange')
-  endif
-  if exists('*FugitiveHead') && !exists('s:orig_FugitiveHead')
-    let s:orig_FugitiveHead = function('FugitiveHead')
-  endif
-  if exists('*FugitivePath') && !exists('s:orig_FugitivePath')
-    let s:orig_FugitivePath = function('FugitivePath')
-  endif
-  if exists('*FugitiveStatusline') && !exists('s:orig_FugitiveStatusline')
-    let s:orig_FugitiveStatusline = function('FugitiveStatusline')
-  endif
-  if exists('*FugitiveActualDir') && !exists('s:orig_FugitiveActualDir')
-    let s:orig_FugitiveActualDir = function('FugitiveActualDir')
-  endif
-  if exists('*FugitiveCommonDir') && !exists('s:orig_FugitiveCommonDir')
-    let s:orig_FugitiveCommonDir = function('FugitiveCommonDir')
-  endif
-  if exists('*FugitiveWorkTree') && !exists('s:orig_FugitiveWorkTree')
-    let s:orig_FugitiveWorkTree = function('FugitiveWorkTree')
-  endif
-  if exists('*FugitiveIsGitDir') && !exists('s:orig_FugitiveIsGitDir')
-    let s:orig_FugitiveIsGitDir = function('FugitiveIsGitDir')
-  endif
-  if exists('*FugitiveExtractGitDir') && !exists('s:orig_FugitiveExtractGitDir')
-    let s:orig_FugitiveExtractGitDir = function('FugitiveExtractGitDir')
-  endif
-  if exists('*FugitiveDetect') && !exists('s:orig_FugitiveDetect')
-    let s:orig_FugitiveDetect = function('FugitiveDetect')
-  endif
-  if exists('*FugitiveGitPath') && !exists('s:orig_FugitiveGitPath')
-    let s:orig_FugitiveGitPath = function('FugitiveGitPath')
-  endif
-  if exists('*FugitiveVimPath') && !exists('s:orig_FugitiveVimPath')
-    let s:orig_FugitiveVimPath = function('FugitiveVimPath')
-  endif
-  if !exists('*fugitive#Foldtext')
-    try
-      call fugitive#GitVersion()
-    catch
-    endtry
-  endif
-  if exists('*fugitive#Foldtext') && !exists('s:orig_fugitive_Foldtext')
-    let s:orig_fugitive_Foldtext = function('fugitive#Foldtext')
-  endif
-  if exists('*fugitive#statusline') && !exists('s:orig_fugitive_statusline')
-    let s:orig_fugitive_statusline = function('fugitive#statusline')
-  endif
-  if exists('*fugitive#Cwindow') && !exists('s:orig_fugitive_Cwindow')
-    let s:orig_fugitive_Cwindow = function('fugitive#Cwindow')
-  endif
-  if exists('*fugitive#repo') && !exists('s:orig_fugitive_repo')
-    let s:orig_fugitive_repo = function('fugitive#repo')
-  endif
-  if exists('*fugitive#CompletePath') && !exists('s:orig_fugitive_CompletePath')
-    let s:orig_fugitive_CompletePath = function('fugitive#CompletePath')
-  endif
-  if exists('*fugitive#PathComplete') && !exists('s:orig_fugitive_PathComplete')
-    let s:orig_fugitive_PathComplete = function('fugitive#PathComplete')
-  endif
-  if exists('*fugitive#CompleteObject') && !exists('s:orig_fugitive_CompleteObject')
-    let s:orig_fugitive_CompleteObject = function('fugitive#CompleteObject')
-  endif
-  if exists('*fugitive#GitVersion') && !exists('s:orig_fugitive_GitVersion')
-    let s:orig_fugitive_GitVersion = function('fugitive#GitVersion')
-  endif
-  if exists('*fugitive#Head') && !exists('s:orig_fugitive_Head')
-    let s:orig_fugitive_Head = function('fugitive#Head')
-  endif
-  if exists('*fugitive#RevParse') && !exists('s:orig_fugitive_RevParse')
-    let s:orig_fugitive_RevParse = function('fugitive#RevParse')
-  endif
-  if exists('*fugitive#Autowrite') && !exists('s:orig_fugitive_Autowrite')
-    let s:orig_fugitive_Autowrite = function('fugitive#Autowrite')
-  endif
-  if exists('*fugitive#Wait') && !exists('s:orig_fugitive_Wait')
-    let s:orig_fugitive_Wait = function('fugitive#Wait')
-  endif
-  if exists('*fugitive#Parse') && !exists('s:orig_fugitive_Parse')
-    let s:orig_fugitive_Parse = function('fugitive#Parse')
-  endif
-  if exists('*fugitive#Real') && !exists('s:orig_fugitive_Real')
-    let s:orig_fugitive_Real = function('fugitive#Real')
-  endif
-  if exists('*fugitive#Path') && !exists('s:orig_fugitive_Path')
-    let s:orig_fugitive_Path = function('fugitive#Path')
-  endif
-  if exists('*fugitive#Config') && !exists('s:orig_fugitive_Config')
-    let s:orig_fugitive_Config = function('fugitive#Config')
-  endif
-  if exists('*fugitive#ConfigGetAll') && !exists('s:orig_fugitive_ConfigGetAll')
-    let s:orig_fugitive_ConfigGetAll = function('fugitive#ConfigGetAll')
-  endif
-  if exists('*fugitive#ConfigGetRegexp') && !exists('s:orig_fugitive_ConfigGetRegexp')
-    let s:orig_fugitive_ConfigGetRegexp = function('fugitive#ConfigGetRegexp')
-  endif
-  if exists('*fugitive#Remote') && !exists('s:orig_fugitive_Remote')
-    let s:orig_fugitive_Remote = function('fugitive#Remote')
-  endif
-  if exists('*fugitive#RemoteUrl') && !exists('s:orig_fugitive_RemoteUrl')
-    let s:orig_fugitive_RemoteUrl = function('fugitive#RemoteUrl')
-  endif
-  if exists('*fugitive#SshConfig') && !exists('s:orig_fugitive_SshConfig')
-    let s:orig_fugitive_SshConfig = function('fugitive#SshConfig')
-  endif
-  if exists('*fugitive#ExpireConfig') && !exists('s:orig_fugitive_ExpireConfig')
-    let s:orig_fugitive_ExpireConfig = function('fugitive#ExpireConfig')
+  if exists('*FugitiveStatusline') && !exists('g:Orig_FugitiveStatusline')
+    call s:SaveOriginalFunction('FugitiveStatusline')
+    let g:Orig_FugitiveStatusline = function('s:Orig_FugitiveStatusline')
   endif
   call s:InstallGuards()
 endfunction
@@ -163,186 +70,63 @@ function! s:InstallGuards() abort
     if exists('*spectregit#statusline#Get')
       return call('spectregit#statusline#Get', a:000)
     endif
-    return call(s:orig_FugitiveStatusline, a:000)
+    return call(g:Orig_FugitiveStatusline, a:000)
   endfunction
-  if exists('*fugitive#Foldtext')
-    function! fugitive#Foldtext() abort
-      if exists('*spectregit#fold#Text')
-        return spectregit#fold#Text()
-      endif
-      return s:orig_fugitive_Foldtext()
-    endfunction
-  endif
-  if exists('*fugitive#statusline')
-    function! fugitive#statusline() abort
-      if exists('*spectregit#statusline#Get')
-        return spectregit#statusline#Get()
-      endif
-      return s:orig_fugitive_statusline()
-    endfunction
-  endif
-  if exists('*fugitive#Cwindow')
-    function! fugitive#Cwindow() abort
-      if exists('*spectregit#quickfix#Cwindow')
-        return spectregit#quickfix#Cwindow()
-      endif
-      return s:orig_fugitive_Cwindow()
-    endfunction
-  endif
-  if exists('*fugitive#GitVersion')
-    function! fugitive#GitVersion(...) abort
-      if exists('*spectregit#git#GitVersion')
-        return call('spectregit#git#GitVersion', a:000)
-      endif
-      return call(s:orig_fugitive_GitVersion, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#Head')
-    function! fugitive#Head(...) abort
-      if exists('*spectregit#git#Head')
-        return call('spectregit#git#Head', a:000)
-      endif
-      return call(s:orig_fugitive_Head, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#RevParse')
-    function! fugitive#RevParse(rev, ...) abort
-      if exists('*spectregit#git#RevParse')
-        return call('spectregit#git#RevParse', [a:rev] + a:000)
-      endif
-      return call(s:orig_fugitive_RevParse, [a:rev] + a:000)
-    endfunction
-  endif
-  if exists('*fugitive#Autowrite')
-    function! fugitive#Autowrite() abort
-      if exists('*spectregit#git#Autowrite')
-        return spectregit#git#Autowrite()
-      endif
-      return s:orig_fugitive_Autowrite()
-    endfunction
-  endif
-  if exists('*fugitive#Wait')
-    function! fugitive#Wait(job_or_jobs, ...) abort
-      if exists('*spectregit#git#Wait')
-        return call('spectregit#git#Wait', [a:job_or_jobs] + a:000)
-      endif
-      return call(s:orig_fugitive_Wait, [a:job_or_jobs] + a:000)
-    endfunction
-  endif
-  if exists('*fugitive#Parse')
-    function! fugitive#Parse(...) abort
-      if exists('*spectregit#path#Parse')
-        return call('spectregit#path#Parse', a:000)
-      endif
-      return call(s:orig_fugitive_Parse, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#Real')
-    function! fugitive#Real(...) abort
-      if exists('*spectregit#path#Real')
-        return call('spectregit#path#Real', a:000)
-      endif
-      return call(s:orig_fugitive_Real, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#Path')
-    function! fugitive#Path(...) abort
-      if exists('*spectregit#path#Path')
-        return call('spectregit#path#Path', a:000)
-      endif
-      return call(s:orig_fugitive_Path, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#repo')
-    function! fugitive#repo(...) abort
-      if exists('*spectregit#repo#New')
-        return call('spectregit#repo#New', a:000)
-      endif
-      return call(s:orig_fugitive_repo, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#CompletePath')
-    function! fugitive#CompletePath(base, ...) abort
-      if exists('*spectregit#complete#CompletePath')
-        return call('spectregit#complete#CompletePath', [a:base] + a:000)
-      endif
-      return call(s:orig_fugitive_CompletePath, [a:base] + a:000)
-    endfunction
-  endif
-  if exists('*fugitive#PathComplete')
-    function! fugitive#PathComplete(...) abort
-      if exists('*spectregit#complete#PathComplete')
-        return call('spectregit#complete#PathComplete', a:000)
-      endif
-      return call(s:orig_fugitive_PathComplete, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#CompleteObject')
-    function! fugitive#CompleteObject(base, ...) abort
-      if exists('*spectregit#complete#Object')
-        return call('spectregit#complete#Object', [a:base] + a:000)
-      endif
-      return call(s:orig_fugitive_CompleteObject, [a:base] + a:000)
-    endfunction
-  endif
-  if exists('*fugitive#Config')
-    function! fugitive#Config(...) abort
-      if exists('*spectregit#config#Config')
-        return call('spectregit#config#Config', a:000)
-      endif
-      return call(s:orig_fugitive_Config, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#ConfigGetAll')
-    function! fugitive#ConfigGetAll(name, ...) abort
-      if exists('*spectregit#config#ConfigGetAll')
-        return call('spectregit#config#ConfigGetAll', [a:name] + a:000)
-      endif
-      return call(s:orig_fugitive_ConfigGetAll, [a:name] + a:000)
-    endfunction
-  endif
-  if exists('*fugitive#ConfigGetRegexp')
-    function! fugitive#ConfigGetRegexp(pattern, ...) abort
-      if exists('*spectregit#config#ConfigGetRegexp')
-        return call('spectregit#config#ConfigGetRegexp', [a:pattern] + a:000)
-      endif
-      return call(s:orig_fugitive_ConfigGetRegexp, [a:pattern] + a:000)
-    endfunction
-  endif
-  if exists('*fugitive#Remote')
-    function! fugitive#Remote(...) abort
-      if exists('*spectregit#config#Remote')
-        return call('spectregit#config#Remote', a:000)
-      endif
-      return call(s:orig_fugitive_Remote, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#RemoteUrl')
-    function! fugitive#RemoteUrl(...) abort
-      if exists('*spectregit#config#RemoteUrl')
-        return call('spectregit#config#RemoteUrl', a:000)
-      endif
-      return call(s:orig_fugitive_RemoteUrl, a:000)
-    endfunction
-  endif
-  if exists('*fugitive#SshConfig')
-    function! fugitive#SshConfig(host, ...) abort
-      if exists('*spectregit#config#SshConfig')
-        return call('spectregit#config#SshConfig', [a:host] + a:000)
-      endif
-      return call(s:orig_fugitive_SshConfig, [a:host] + a:000)
-    endfunction
-  endif
-  if exists('*fugitive#ExpireConfig')
-    function! fugitive#ExpireConfig(...) abort
-      if exists('*spectregit#config#ExpireConfig')
-        return call('spectregit#config#ExpireConfig', a:000)
-      endif
-      return call(s:orig_fugitive_ExpireConfig, a:000)
-    endfunction
-  endif
+  function! FugitiveGitDir(...) abort
+    if exists('*spectregit#core#GitDirRaw')
+      return call('spectregit#core#GitDirRaw', a:000)
+    endif
+    return call(g:Orig_FugitiveGitDir, a:000)
+  endfunction
   exe "command! -bar -bang -nargs=? -complete=customlist,spectregit#cd#Complete Gcd exe spectregit#cd#Cd(<q-args>)"
   exe "command! -bar -bang -nargs=? -complete=customlist,spectregit#cd#Complete Glcd exe spectregit#cd#Lcd(<q-args>)"
+
+  let s:addr_other = has('patch-8.1.560') || has('nvim-0.5.0') ? '-addr=other' : ''
+  let s:addr_tabs  = has('patch-7.4.542') ? '-addr=tabs' : ''
+  let s:addr_wins  = has('patch-7.4.542') ? '-addr=windows' : ''
+
+  exe 'command! -bar -bang -nargs=*                          -complete=customlist,spectregit#edit#Complete   Ge       exe spectregit#edit#Open("edit<bang>", 0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=*                          -complete=customlist,spectregit#edit#Complete   Gedit    exe spectregit#edit#Open("edit<bang>", 0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=*                          -complete=customlist,spectregit#edit#Complete   Gpedit   exe spectregit#edit#Open("pedit", <bang>0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=* -range=-1' s:addr_other '-complete=customlist,spectregit#edit#Complete   Gsplit   exe spectregit#edit#Open((<count> > 0 ? <count> : "").(<count> ? "split" : "edit<bang>"), 0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=* -range=-1' s:addr_other '-complete=customlist,spectregit#edit#Complete   Gvsplit  exe spectregit#edit#Open((<count> > 0 ? <count> : "").(<count> ? "vsplit" : "edit<bang>"), 0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=* -range=-1' s:addr_tabs  '-complete=customlist,spectregit#edit#Complete   Gtabedit exe spectregit#edit#Open((<count> >= 0 ? <count> : "")."tabedit", <bang>0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=*                          -complete=customlist,spectregit#edit#Complete   Gdrop    exe spectregit#edit#DropCommand(<line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)'
+
+  if exists(':Gr') != 2
+    exe 'command! -bar -bang -nargs=* -range=-1                -complete=customlist,spectregit#edit#ReadComplete   Gr     exe spectregit#edit#ReadCommand(<line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)'
+  endif
+  exe 'command! -bar -bang -nargs=* -range=-1                -complete=customlist,spectregit#edit#ReadComplete   Gread    exe spectregit#edit#ReadCommand(<line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)'
+
+  exe 'command! -bar -bang -nargs=* -complete=customlist,spectregit#edit#Complete Gw     exe spectregit#write#WriteCommand(<line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=* -complete=customlist,spectregit#edit#Complete Gwrite exe spectregit#write#WriteCommand(<line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=* -complete=customlist,spectregit#edit#Complete Gwq    exe spectregit#write#WqCommand(   <line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)'
+
+  exe 'command! -bar -bang -nargs=* -complete=customlist,spectregit#edit#Complete Gdiffsplit  exe spectregit#diff#Diffsplit(1, <bang>0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=* -complete=customlist,spectregit#edit#Complete Ghdiffsplit exe spectregit#diff#Diffsplit(0, <bang>0, "<mods>", <q-args>)'
+  exe 'command! -bar -bang -nargs=* -complete=customlist,spectregit#edit#Complete Gvdiffsplit exe spectregit#diff#Diffsplit(0, <bang>0, "vertical <mods>", <q-args>)'
+
+  exe 'command! -bang -nargs=? -range=-1' s:addr_wins '-complete=customlist,spectregit#grep#GrepComplete Ggrep  exe spectregit#grep#GrepCommand(<line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)'
+  exe 'command! -bang -nargs=? -range=-1' s:addr_wins '-complete=customlist,spectregit#grep#GrepComplete Glgrep exe spectregit#grep#GrepCommand(0, <count> > 0 ? <count> : 0, +"<range>", <bang>0, "<mods>", <q-args>)'
+
+  exe 'command! -bar -bang -range=-1 -nargs=* -complete=customlist,spectregit#complete#Object GBrowse exe spectregit#browse#BrowseCommand(<line1>, <count>, +"<range>", <bang>0, "<mods>", <q-args>)'
+
+  exe 'command! -bar -bang -range=-1 -nargs=* -complete=customlist,spectregit#blame#Complete Gblame  exe spectregit#blame#Subcommand(<line1>, <count>, +"<range>", <bang>0, "<mods>", {"subcommand": "blame", "flags": [], "subcommand_args": [<f-args>], "mods": "<mods>"})'
+
+  exe 'command! -bar -bang -nargs=* -range=-1 -count=0 -addr=other -complete=customlist,spectregit#complete#Object Gstatus exe spectregit#status#StatusCommand(<line1>, <line2>, <range>, <count>, <bang>0, "<mods>", "<reg>", <q-args>, [<f-args>])'
+
+  augroup spectregit_status
+    autocmd!
+    autocmd BufWritePost         * call spectregit#status#DidChange(+expand('<abuf>'), 0)
+    autocmd User FileChmodPost,FileUnlinkPost call spectregit#status#DidChange(+expand('<abuf>'), 0)
+    autocmd ShellCmdPost,ShellFilterPost * nested call spectregit#status#DidChange(0)
+    autocmd QuickFixCmdPost make,lmake,[cl]file,[cl]getfile nested
+          \ call spectregit#status#DidChange(fugitive#EfmDir())
+    autocmd FocusGained        *
+          \ if get(g:, 'fugitive_focus_gained', !has('win32')) |
+          \   call spectregit#status#DidChange(0) |
+          \ endif
+  augroup END
 endfunction
 
 augroup spectregit_init
