@@ -182,6 +182,30 @@ function! s:ReadPrepare(line1, count, range, mods) abort
   return [pre . 'keepalt ' . mods . after . 'read', '|' . delete . 'diffupdate' . (a:count < 0 ? '|' . line('.') : '')]
 endfunction
 
+function! spectregit#edit#FileReadCmd(...) abort
+  let amatch = a:0 ? a:1 : expand('<amatch>')
+  let [dir, commit, file] = spectregit#core#DirCommitFile(amatch)
+  let line = a:0 > 1 ? a:2 : line("'[")
+  if empty(dir)
+    return 'noautocmd ' . line . 'read ' . spectregit#core#fnameescape(amatch)
+  endif
+  if commit !~# ':' && spectregit#core#ChompDefault('', [dir, 'cat-file', '-t', commit]) =~# '^\%(commit\|tag\)$'
+    let cmd = [dir, 'log', '--pretty=format:%B', '-1', commit, '--']
+  elseif commit ==# ':'
+    let cmd = [dir, 'status', '--short']
+  else
+    let cmd = [dir, 'cat-file', '-p', commit . file, '--']
+  endif
+  let temp = tempname()
+  let [err, exec_error] = spectregit#git#StdoutToFile(temp, cmd)
+  if exec_error
+    call delete(temp)
+    return 'noautocmd ' . line . 'read ' . spectregit#core#fnameescape(amatch)
+  else
+    return 'silent keepalt ' . line . 'read ' . spectregit#core#fnameescape(temp) . '|call delete(' . string(temp) . ')'
+  endif
+endfunction
+
 function! spectregit#edit#ReadCommand(line1, count, range, bang, mods, arg, ...) abort
   exe spectregit#core#VersionCheck()
   let [read, post] = s:ReadPrepare(a:line1, a:count, a:range, a:mods)

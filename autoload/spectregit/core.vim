@@ -33,7 +33,7 @@ endfunction
 
 " INTERNAL entry point used by the FugitiveGitDir() guard to prevent recursion.
 function! spectregit#core#GitDirRaw(...) abort
-  return call(g:Orig_FugitiveGitDir, a:000)
+  return call('FugitiveGitDir', a:000)
 endfunction
 
 " PUBLIC entry point used by all spectregit#* modules.
@@ -185,6 +185,10 @@ function! spectregit#core#Quote(string) abort
   endif
 endfunction
 
+function! spectregit#core#UrlDecode(str) abort
+  return substitute(a:str, '%\(\x\x\)', '\=iconv(nr2char("0x".submatch(1)), "utf-8", "latin1")', 'g')
+endfunction
+
 function! spectregit#core#Unquote(string) abort
   let string = substitute(a:string, "\t*$", '', '')
   if string =~# '^".*"$'
@@ -323,10 +327,133 @@ function! spectregit#core#LineChars(pattern) abort
   return chars
 endfunction
 
+let s:git_index_file_env = {}
+function! spectregit#core#GitIndexFileEnv() abort
+  if $GIT_INDEX_FILE =~# '^/\|^\a:' && !has_key(s:git_index_file_env, $GIT_INDEX_FILE)
+    let s:git_index_file_env[$GIT_INDEX_FILE] = spectregit#core#Slash(FugitiveVimPath($GIT_INDEX_FILE))
+  endif
+  return get(s:git_index_file_env, $GIT_INDEX_FILE, '')
+endfunction
+
+function! spectregit#core#Result(...) abort
+  if !a:0 && exists('g:fugitive_event')
+    return get(g:, 'fugitive_result', {})
+  elseif !a:0 || type(a:1) == type('') && a:1 =~# '^-\=$'
+    return get(g:, '_fugitive_last_job', {})
+  elseif type(a:1) == type(0)
+    return spectregit#core#TempState(a:1)
+  elseif type(a:1) == type('')
+    return spectregit#core#TempState(a:1)
+  elseif type(a:1) == type({}) && has_key(a:1, 'file')
+    return spectregit#core#TempState(a:1.file)
+  else
+    return {}
+  endif
+endfunction
+
 function! spectregit#core#UsableWin(nr) abort
   return a:nr && !getwinvar(a:nr, '&previewwindow') && !getwinvar(a:nr, '&winfixwidth') &&
         \ !getwinvar(a:nr, '&winfixbuf') &&
         \ (empty(getwinvar(a:nr, 'fugitive_status')) || getbufvar(winbufnr(a:nr), 'fugitive_type') !=# 'index') &&
         \ index(['gitrebase', 'gitcommit'], getbufvar(winbufnr(a:nr), '&filetype')) < 0 &&
         \ index(['nofile','help','quickfix', 'terminal'], getbufvar(winbufnr(a:nr), '&buftype')) < 0
+endfunction
+
+function! spectregit#core#winshell() abort
+  return has('win32') && &shellcmdflag !~# '^-'
+endfunction
+
+function! spectregit#core#shellesc(arg) abort
+  if type(a:arg) == type([])
+    return join(map(copy(a:arg), 'spectregit#core#shellesc(v:val)'))
+  elseif a:arg =~# '^[A-Za-z0-9_/:.-]\+$'
+    return a:arg
+  elseif spectregit#core#winshell()
+    return '"' . spectregit#core#gsub(spectregit#core#gsub(a:arg, '"', '""'), '\%', '"%"') . '"'
+  else
+    return shellescape(a:arg)
+  endif
+endfunction
+
+function! spectregit#core#SystemError(cmd, ...) abort
+  let cmd = type(a:cmd) == type([]) ? spectregit#core#shellesc(a:cmd) : a:cmd
+  try
+    if &shellredir ==# '>' && &shell =~# 'sh\|cmd'
+      let shellredir = &shellredir
+      if &shell =~# 'csh'
+        set shellredir=>&
+      else
+        set shellredir=>%s\ 2>&1
+      endif
+    endif
+    if exists('+guioptions') && &guioptions =~# '!'
+      let guioptions = &guioptions
+      set guioptions-=!
+    endif
+    let out = call('system', [cmd] + a:000)
+    return [out, v:shell_error]
+  catch /^Vim\%((\a\+)\)\=:E484:/
+    let opts = ['shell', 'shellcmdflag', 'shellredir', 'shellquote', 'shellxquote', 'shellxescape', 'shellslash']
+    call filter(opts, 'exists("+".v:val) && !empty(eval("&".v:val))')
+    call map(opts, 'v:val."=".eval("&".v:val)')
+    call spectregit#core#Throw('failed to run `' . cmd . '` with ' . join(opts, ' '))
+  finally
+    if exists('shellredir')
+      let &shellredir = shellredir
+    endif
+    if exists('guioptions')
+      let &guioptions = guioptions
+    endif
+  endtry
+endfunction
+
+function! spectregit#core#TempDeleteAll() abort
+  return ''
+endfunction
+
+function! spectregit#core#StdoutToFile(out, cmd, ...) abort
+  let [argv, jopts, _] = fugitive#PrepareJob(a:cmd)
+  let exit = []
+  if exists('*jobstart')
+    call extend(jopts, {
+          \ 'stdout_buffered': v:true,
+          \ 'stderr_buffered': v:true,
+          \ 'on_exit': { j, code, _ -> add(exit, code) }})
+    let job = jobstart(argv, jopts)
+    if a:0
+      call chansend(job, a:1)
+    endif
+    call chanclose(job, 'stdin')
+    call jobwait([job])
+    if len(a:out)
+      call writefile(jopts.stdout, a:out, 'b')
+    endif
+    return [join(jopts.stderr, "\n"), exit[0]]
+  elseif exists('*ch_close_in')
+    try
+      let err = tempname()
+      call extend(jopts, {
+            \ 'out_io': len(a:out) ? 'file' : 'null',
+            \ 'out_name': a:out,
+            \ 'err_io': 'file',
+            \ 'err_name': err,
+            \ 'exit_cb': { j, code -> add(exit, code) }})
+      let job = job_start(argv, jopts)
+      if a:0
+        call ch_sendraw(job, a:1)
+      endif
+      call ch_close_in(job)
+      while ch_status(job) !~# '^closed$\|^fail$' || job_status(job) ==# 'run'
+        sleep 1m
+      endwhile
+      return [join(readfile(err, 'b'), "\n"), exit[0]]
+    finally
+      call delete(err)
+    endtry
+  elseif spectregit#core#winshell() || &shell !~# 'sh' || &shell =~# 'fish\|\%(powershell\|pwsh\)\%(\.exe\)\=$'
+    throw 'fugitive: Vim 8 or higher required to use ' . &shell
+  else
+    let cmd = fugitive#ShellCommand(a:cmd)
+    return call('spectregit#core#SystemError', [' (' . cmd . ' >' . (len(a:out) ? a:out : '/dev/null') . ') '] + a:000)
+  endif
 endfunction
