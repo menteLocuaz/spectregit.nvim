@@ -5,11 +5,11 @@ let s:prototype = {}
 
 function! s:add_methods(namespace, method_names) abort
   for name in a:method_names
-    let s:{a:namespace}_prototype[name] = function('s:' . a:namespace . '_' . name)
+    let s:prototype[name] = function('s:' . a:namespace . '_' . name)
   endfor
 endfunction
 
-function! spectregit#repo#New(...) abort
+function! spectregit#repo#Get(...) abort
   let dir = a:0 ? spectregit#core#Dir(a:1) : (len(spectregit#core#Dir()) ? spectregit#core#Dir() : FugitiveExtractGitDir(expand('%:p')))
   if dir !=# ''
     return extend({'git_dir': dir, 'fugitive_dir': dir}, s:prototype, 'keep')
@@ -21,7 +21,7 @@ function! s:repo_dir(...) dict abort
   if !a:0
     return self.git_dir
   endif
-  throw 'fugitive: fugitive#repo().dir("...") has been replaced by FugitiveFind(".git/...")'
+  throw 'fugitive: spectregit#repo#Get().dir("...") has been replaced by FugitiveFind(".git/...")'
 endfunction
 
 function! s:repo_tree(...) dict abort
@@ -31,7 +31,7 @@ function! s:repo_tree(...) dict abort
   elseif !a:0
     return tree
   endif
-  throw 'fugitive: fugitive#repo().tree("...") has been replaced by FugitiveFind(":(top)...")'
+  throw 'fugitive: spectregit#repo#Get().tree("...") has been replaced by FugitiveFind(":(top)...")'
 endfunction
 
 function! s:repo_bare() dict abort
@@ -53,7 +53,7 @@ endfunction
 call s:add_methods('repo', ['dir', 'tree', 'bare', 'find', 'translate', 'head'])
 
 function! s:repo_git_command(...) dict abort
-  throw 'fugitive: fugitive#repo().git_command(...) has been replaced by FugitiveShellCommand(...)'
+  throw 'fugitive: spectregit#repo#Get().git_command(...) has been replaced by FugitiveShellCommand(...)'
 endfunction
 
 function! s:repo_git_chomp(...) dict abort
@@ -65,7 +65,7 @@ function! s:repo_git_chomp_in_tree(...) dict abort
 endfunction
 
 function! s:repo_rev_parse(rev) dict abort
-  throw 'fugitive: fugitive#repo().rev_parse(...) has been replaced by FugitiveExecute("rev-parse", "--verify", ...).stdout'
+  throw 'fugitive: spectregit#repo#Get().rev_parse(...) has been replaced by FugitiveExecute("rev-parse", "--verify", ...).stdout'
 endfunction
 
 call s:add_methods('repo', ['git_command', 'git_chomp', 'git_chomp_in_tree', 'rev_parse'])

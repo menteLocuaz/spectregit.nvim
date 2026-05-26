@@ -1,7 +1,7 @@
 if exists('g:autoloaded_spectregit_fold') | finish | endif
 let g:autoloaded_spectregit_fold = 1
 
-function! spectregit#fold#Text() abort
+function! spectregit#fold#Foldtext() abort
   if &foldmethod !=# 'syntax'
     return foldtext()
   endif
@@ -13,7 +13,7 @@ function! spectregit#fold#Text() abort
     for lnum in range(v:foldstart, v:foldend)
       let line = getline(lnum)
       if filename ==# '' && line =~# '^[+-]\{3\} "\=[abciow12]/'
-        let filename = fugitive#Unquote(line[4:-1])[2:-1]
+        let filename = spectregit#core#Unquote(line[4:-1])[2:-1]
       endif
       if line =~# '^+'
         let add += 1
@@ -24,7 +24,7 @@ function! spectregit#fold#Text() abort
       endif
     endfor
     if filename ==# ''
-      let filename = fugitive#Unquote(matchstr(line_foldstart, '^diff .\{-\} \zs"\=[abciow12]/\zs.*\ze "\=[abciow12]/'))[2:-1]
+      let filename = spectregit#core#Unquote(matchstr(line_foldstart, '^diff .\{-\} \zs"\=[abciow12]/\zs.*\ze "\=[abciow12]/'))[2:-1]
     endif
     if filename ==# ''
       let filename = line_foldstart[5:-1]
