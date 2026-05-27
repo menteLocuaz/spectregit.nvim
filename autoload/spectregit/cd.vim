@@ -2,7 +2,7 @@ if exists('g:autoloaded_spectregit_cd') | finish | endif
 let g:autoloaded_spectregit_cd = 1
 
 function! spectregit#cd#Complete(A, L, P) abort
-  return filter(fugitive#CompletePath(a:A), 'v:val =~# "/$"')
+  return filter(spectregit#complete#Path(a:A), 'v:val =~# "/$"')
 endfunction
 
 function! spectregit#cd#Cd(path, ...) abort

@@ -82,7 +82,7 @@ function! spectregit#complete#Object(base, ...) abort
   if len(tree) && spectregit#core#cpath(tree . '/', cwd[0 : len(tree)])
     let subdir = strpart(cwd, len(tree) + 1) . '/'
   endif
-  let base = fugitive#Expand(a:base)
+  let base = spectregit#edit#Expand(a:base)
 
   if a:base =~# '^!\d*$' && base !~# '^!'
     return [base]

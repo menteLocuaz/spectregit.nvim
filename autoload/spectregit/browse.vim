@@ -40,6 +40,39 @@ function! s:BrowserOpen(url, mods, echo_copy) abort
   endif
 endfunction
 
+function! spectregit#browse#Url(rev, opts, ...) abort
+  let dir = a:0 ? a:1 : spectregit#core#Dir()
+  let remote_url = spectregit#config#RemoteUrl(a:opts.remote, dir)
+  if empty(remote_url)
+    let remote_url = spectregit#config#RemoteUrl('origin', dir)
+  endif
+  if remote_url =~# '^git@[^:]\+:'
+    let remote_url = substitute(remote_url, '^git@\([^:]\+\):', 'https://\1/', '')
+  endif
+  let remote_url = substitute(remote_url, '\.git$', '', '')
+  if empty(a:rev) || a:rev ==# ':'
+    return remote_url
+  endif
+  let sha = a:rev
+  if a:rev =~# '^\x\{40,\}$'
+    return remote_url . '/commit/' . sha
+  elseif a:rev =~# ':'
+    let parts = split(a:rev, ':')
+    let sha = parts[0]
+    let path = parts[1]
+    let url = remote_url . '/blob/' . sha . '/' . path
+    if a:opts.line1 > 0
+      let url .= '#L' . a:opts.line1
+      if a:opts.line2 > a:opts.line1
+        let url .= '-L' . a:opts.line2
+      endif
+    endif
+    return url
+  else
+    return remote_url . '/commits/' . a:rev
+  endif
+endfunction
+
 function! spectregit#browse#BrowseCommand(line1, count, range, bang, mods, arg, ...) abort
   exe spectregit#core#VersionCheck()
   let dir = spectregit#core#Dir()
@@ -53,7 +86,7 @@ function! spectregit#browse#BrowseCommand(line1, count, range, bang, mods, arg, 
     if arg ==# '-'
       let remote = ''
       let rev = ''
-      let result = fugitive#Result()
+      let result = spectregit#core#Result()
       if filereadable(get(result, 'file', ''))
         let rev = spectregit#core#fnameescape(result.file)
       else
@@ -65,7 +98,7 @@ function! spectregit#browse#BrowseCommand(line1, count, range, bang, mods, arg, 
     else
       let rev = arg
     endif
-    let expanded = fugitive#Expand(rev)
+    let expanded = spectregit#edit#Expand(rev)
     if expanded =~? '^\a\a\+:[\/][\/]' && expanded !~? '^fugitive:'
       return s:BrowserOpen(spectregit#core#Slash(expanded), a:mods, a:bang)
     endif
@@ -82,7 +115,7 @@ function! spectregit#browse#BrowseCommand(line1, count, range, bang, mods, arg, 
       return 'echoerr ' . string('fugitive: no URL found in output of :Git')
     endif
     if empty(remote) && expanded =~# '^[^-./:^~][^:^~]*$' && !empty(dir)
-      let config = fugitive#Config(dir)
+      let config = spectregit#config#Config(dir)
       if !empty(FugitiveConfigGet('remote.' . expanded . '.url', config))
         let remote = expanded
         let expanded = ''
@@ -108,7 +141,7 @@ function! spectregit#browse#BrowseCommand(line1, count, range, bang, mods, arg, 
           \ 'line1': line1,
           \ 'line2': line2,
           \ 'remote': remote}
-    return s:BrowserOpen(call('fugitive#BrowseUrl', [expanded, opts] + (empty(dir) ? [] : [dir])), a:mods, a:bang)
+    return s:BrowserOpen(call('spectregit#browse#Url', [expanded, opts] + (empty(dir) ? [] : [dir])), a:mods, a:bang)
   catch /^fugitive:/
     return 'echoerr ' . string(v:exception)
   endtry

@@ -69,16 +69,16 @@ function! s:BlameCommit(cmd, ...) abort
   let [commit, path, lnum] = s:BlameCommitFileLnum(line, state)
   if empty(commit) && len(path) && has_key(state, 'blame_reverse_end')
     let path = (len(state.blame_reverse_end) ? state.blame_reverse_end . ':' : ':(top)') . path
-    return fugitive#Open(mods . a:cmd, 0, '', '+' . lnum . ' ' . spectregit#core#fnameescape(path), ['+' . lnum, path])
+    return spectregit#edit#Open(mods . a:cmd, 0, '', '+' . lnum . ' ' . spectregit#core#fnameescape(path), ['+' . lnum, path])
   endif
   if commit =~# '^0*$'
     return 'echoerr ' . string('fugitive: no commit')
   endif
   if line =~# '^\^' && !has_key(state, 'blame_reverse_end')
     let path = commit . ':' . path
-    return fugitive#Open(mods . a:cmd, 0, '', '+' . lnum . ' ' . spectregit#core#fnameescape(path), ['+' . lnum, path])
+    return spectregit#edit#Open(mods . a:cmd, 0, '', '+' . lnum . ' ' . spectregit#core#fnameescape(path), ['+' . lnum, path])
   endif
-  let cmd = fugitive#Open(mods . a:cmd, 0, '', commit, [commit])
+  let cmd = spectregit#edit#Open(mods . a:cmd, 0, '', commit, [commit])
   if cmd =~# '^echoerr'
     return cmd
   endif
@@ -305,7 +305,7 @@ function! spectregit#blame#Subcommand(line1, count, range, bang, mods, options) 
   let title = 'blame ' . join(subcommand_args, ' ')
   
   let mods = spectregit#core#Mods(a:mods)
-  execute mods . 'edit fugitive://' . fugitive#UrlDecode(git_dir) . '//' . title
+  execute mods . 'edit fugitive://' . spectregit#core#UrlDecode(git_dir) . '//' . title
   setlocal buftype=nofile bufhidden=wipe noswapfile filetype=fugitiveblame
   call setline(1, result.stdout)
   setlocal nomodifiable

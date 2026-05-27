@@ -1,6 +1,10 @@
 if exists('g:autoloaded_spectregit_status') | finish | endif
 let g:autoloaded_spectregit_status = 1
 
+function! spectregit#status#BufReadStatus(cmdbang) abort
+  return fugitive#BufReadStatus(a:cmdbang)
+endfunction
+
 function! spectregit#status#StatusCommand(line1, line2, range, count, bang, mods, reg, arg, args, ...) abort
   let dir = a:0 ? spectregit#core#Dir(a:1) : spectregit#core#Dir()
   exe spectregit#core#DirCheck(dir)
@@ -45,7 +49,7 @@ function! s:ReloadStatusBuffer() abort
   endif
   let original_lnum = line('.')
   let info = spectregit#maps#StageInfo(original_lnum)
-  exe fugitive#BufReadStatus(0)
+  exe spectregit#status#BufReadStatus(0)
   call setpos('.', [0, s:StageSeek(info, original_lnum), 1, 0])
   return ''
 endfunction
