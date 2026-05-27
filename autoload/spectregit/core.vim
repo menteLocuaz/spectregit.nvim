@@ -368,6 +368,36 @@ function! spectregit#core#DirCheck(...) abort
   endif
 endfunction
 
+function! spectregit#core#ArgSplit(string) abort
+  let string = a:string
+  let args = []
+  while string =~# '\S'
+    let arg = matchstr(string, '^\s*\%(\\.\|\S\)\+')
+    let string = strpart(string, len(arg))
+    let arg = substitute(arg, '^\s\+', '', '')
+    call add(args, substitute(arg, '\\\+[|" ]', '\=submatch(0)[len(submatch(0))/2 : -1]', 'g'))
+  endwhile
+  return args
+endfunction
+
+function! spectregit#core#Mods(mods, ...) abort
+  let mods = substitute(a:mods, '\C<mods>', '', '')
+  let mods = mods =~# '\S$' ? mods . ' ' : mods
+  if a:0 && mods !~# '\<\d*\%(aboveleft\|belowright\|leftabove\|rightbelow\|topleft\|botright\|tab\)\>'
+    let default = a:1
+    if default ==# 'SpanOrigin' || default ==# 'Edge'
+      if mods =~# '\<vertical\>' ? &splitright : &splitbelow
+        let mods = 'botright ' . mods
+      else
+        let mods = 'topleft ' . mods
+      endif
+    elseif default !=# ''
+      let mods = default . ' ' . mods
+    endif
+  endif
+  return substitute(mods, '\s\+', ' ', 'g')
+endfunction
+
 " ─── Execution ───────────────────────────────────────────────────────────────
 
 function! spectregit#core#ChompDefault(default, ...) abort

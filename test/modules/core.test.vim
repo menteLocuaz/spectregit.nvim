@@ -13,7 +13,8 @@ endfunction
 
 function! s:suite.test_fnameescape() abort
   call s:assert.equals(spectregit#core#fnameescape('file name.txt'), 'file\ name.txt')
-  call s:assert.equals(spectregit#core#fnameescape('file[1].txt'), 'file\[1\].txt')
+  let expected = v:version >= 902 ? 'file\[1].txt' : 'file\[1\].txt'
+  call s:assert.equals(spectregit#core#fnameescape('file[1].txt'), expected)
 endfunction
 
 function! s:suite.test_argsplit() abort
