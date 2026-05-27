@@ -126,7 +126,7 @@ function! spectregit#diff#Diffsplit(autodir, keepfocus, mods, arg, ...) abort
         let equalalways = 0
         set equalalways
       endif
-      execute mods 'split' spectregit#core#fnameescape(fugitive#Find(parents[0]))
+      execute mods 'split' spectregit#core#fnameescape(spectregit#path#Find(parents[0]))
       execute 'nnoremap <buffer> <silent> dp :diffput '.nr.'<Bar>diffupdate<CR>'
       let nr2 = bufnr('')
       call s:diffthis()
@@ -134,7 +134,7 @@ function! spectregit#diff#Diffsplit(autodir, keepfocus, mods, arg, ...) abort
       execute 'nnoremap <buffer> <silent> d2o :diffget '.nr2.'<Bar>diffupdate<CR>'
       let mods = substitute(mods, '\Cleftabove\|rightbelow\|aboveleft\|belowright', '\=submatch(0) =~# "f" ? "rightbelow" : "leftabove"', '')
       for i in range(len(parents)-1, 1, -1)
-        execute mods 'split' spectregit#core#fnameescape(fugitive#Find(parents[i]))
+        execute mods 'split' spectregit#core#fnameescape(spectregit#path#Find(parents[i]))
         execute 'nnoremap <buffer> <silent> dp :diffput '.nr.'<Bar>diffupdate<CR>'
         let nrx = bufnr('')
         call s:diffthis()
@@ -160,7 +160,7 @@ function! spectregit#diff#Diffsplit(autodir, keepfocus, mods, arg, ...) abort
         return 'echoerr ' . string('fugitive: change ' . arg . ' to !' . arg . ' to diff against ancestor')
       else
         try
-          let file = arg =~# '^:/.' ? fugitive#RevParse(arg) . s:Relative(':') : fugitive#Expand(arg)
+          let file = arg =~# '^:/.' ? spectregit#git#RevParse(arg) . s:Relative(':') : spectregit#edit#Expand(arg)
         catch /^fugitive:/
           return 'echoerr ' . string(v:exception)
         endtry

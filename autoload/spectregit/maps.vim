@@ -106,7 +106,7 @@ function! spectregit#maps#MapGitOps(is_ftplugin) abort
   exe spectregit#maps#Map('n', 'czp', ':<C-U>Git stash pop --quiet --index stash@{<C-R>=v:count<CR>}<CR>', '', ft)
   exe spectregit#maps#Map('n', 'czP', ':<C-U>Git stash pop --quiet stash@{<C-R>=v:count<CR>}<CR>', '', ft)
   exe spectregit#maps#Map('n', 'czs', ':<C-U>Git stash push --staged<CR>', '', ft)
-  exe spectregit#maps#Map('n', 'czv', ':<C-U>exe "Gedit" fugitive#RevParse("stash@{" . v:count . "}")<CR>', '<silent>', ft)
+  exe spectregit#maps#Map('n', 'czv', ':<C-U>exe "Gedit" spectregit#git#RevParse("stash@{" . v:count . "}")<CR>', '<silent>', ft)
   exe spectregit#maps#Map('n', 'czw', ':<C-U>Git stash push --keep-index<C-R>=v:count > 1 ? " --all" : v:count ? " --include-untracked" : ""<CR><CR>', '', ft)
   exe spectregit#maps#Map('n', 'czz', ':<C-U>Git stash push <C-R>=v:count > 1 ? " --all" : v:count ? " --include-untracked" : ""<CR><CR>', '', ft)
   exe spectregit#maps#Map('n', 'cz?', ':<C-U>help fugitive_cz<CR>', '<silent>', ft)
@@ -141,7 +141,7 @@ endfunction
 function! spectregit#maps#SquashArgument(...) abort
   if &filetype == 'fugitive'
     let commit = matchstr(getline('.'), '^\%(\%(\x\x\x\)\@!\l\+\s\+\)\=\zs[0-9a-f]\{4,\}\ze \|^' . s:ref_header . ': \zs\S\+')
-  elseif !empty(fugitive#Result(bufnr('')))
+  elseif !empty(spectregit#core#Result(bufnr('')))
     let commit = matchstr(getline('.'), '\S\@<!\x\{4,\}\S\@!')
   else
     let commit = s:Owner(@%)
@@ -520,7 +520,7 @@ endfunction
 " ─── Public API ─────────────────────────────────────────────────────
 
 function! spectregit#maps#MapCfile(...) abort
-  exe 'cnoremap <buffer> <expr> <Plug><cfile>' (a:0 ? a:1 : 'fugitive#Cfile()')
+  exe 'cnoremap <buffer> <expr> <Plug><cfile>' (a:0 ? a:1 : 'spectregit#maps#Cfile()')
   let b:undo_ftplugin = get(b:, 'undo_ftplugin', 'exe') . '|sil! exe "cunmap <buffer> <Plug><cfile>"'
   if !exists('g:fugitive_no_maps')
     call spectregit#maps#Map('n', 'gf',          '<SID>:find <Plug><cfile><CR>', '<silent><unique>', 1)
@@ -591,8 +591,8 @@ function! spectregit#maps#MapJumps(...) abort
     call spectregit#maps#Map('n', 'gc',    ":<C-U>exe 'Gpedit ' . spectregit#core#fnameescape(<SID>ContainingCommit())<CR>", '<silent>')
     call spectregit#maps#Map('n', 'gi',    ":<C-U>exe 'Gsplit' (v:count ? '.gitignore' : '.git/info/exclude')<CR>", '<silent>')
     call spectregit#maps#Map('x', 'gi',    ":<C-U>exe 'Gsplit' (v:count ? '.gitignore' : '.git/info/exclude')<CR>", '<silent>')
-    call spectregit#maps#Map('n', '.',     ":<C-U> <C-R>=spectregit#core#fnameescape(fugitive#Real(@%))<CR><Home>")
-    call spectregit#maps#Map('x', '.',     ":<C-U> <C-R>=spectregit#core#fnameescape(fugitive#Real(@%))<CR><Home>")
+    call spectregit#maps#Map('n', '.',     ":<C-U> <C-R>=spectregit#core#fnameescape(spectregit#path#Real(@%))<CR><Home>")
+    call spectregit#maps#Map('x', '.',     ":<C-U> <C-R>=spectregit#core#fnameescape(spectregit#path#Real(@%))<CR><Home>")
     call spectregit#maps#Map('n', 'g?',    ":<C-U>help fugitive-maps<CR>", '<silent>')
     call spectregit#maps#Map('n', '<F1>',  ":<C-U>help fugitive-maps<CR>", '<silent>')
   endif
@@ -618,12 +618,12 @@ endfunction
 
 function! spectregit#maps#PorcelainCfile() abort
   let file = FugitiveFind(s:CfilePorcelain()[0])
-  return empty(file) ? fugitive#Cfile() : spectregit#core#fnameescape(file)
+  return empty(file) ? spectregit#maps#Cfile() : spectregit#core#fnameescape(file)
 endfunction
 
 function! spectregit#maps#MessageCfile() abort
   let file = FugitiveFind(get(s:StatusCfile(), 0, ''))
-  return empty(file) ? fugitive#Cfile() : spectregit#core#fnameescape(file)
+  return empty(file) ? spectregit#maps#Cfile() : spectregit#core#fnameescape(file)
 endfunction
 
 function! spectregit#maps#Cfile() abort

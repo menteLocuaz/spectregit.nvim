@@ -17,7 +17,7 @@ function! s:DirRev(url) abort
 endfunction
 
 function! s:InitializeBuffer(dir) abort
-  let b:git_dir = FugitiveGitDir(a:dir)
+  let b:git_dir = spectregit#core#Dir(a:dir)
 endfunction
 
 function! s:ReplaceCmd(cmd) abort
@@ -42,11 +42,7 @@ function! s:ReplaceCmd(cmd) abort
 endfunction
 
 function! s:TreeChomp(...) abort
-  let r = call('fugitive#Execute', a:000)
-  if !r.exit_status
-    return spectregit#core#JoinChomp(r.stdout)
-  endif
-  throw 'fugitive: error running `' . call('fugitive#ShellCommand', a:000) . '`: ' . spectregit#core#JoinChomp(r.stderr)
+  return call('spectregit#core#TreeChomp', a:000)
 endfunction
 
 function! spectregit#autocmd#BufReadCmd(...) abort
@@ -57,16 +53,16 @@ function! spectregit#autocmd#BufReadCmd(...) abort
   endif
   call s:InitializeBuffer(dir)
   if rev ==# ':'
-    return fugitive#BufReadStatus(v:cmdbang)
+    return spectregit#status#BufReadStatus(v:cmdbang)
   endif
   try
     if rev =~# '^:\d$'
       let b:fugitive_type = 'stage'
     else
-      let r = fugitive#Execute([dir, 'cat-file', '-t', rev])
+      let r = spectregit#git#Execute([dir, 'cat-file', '-t', rev])
       let b:fugitive_type = get(r.stdout, 0, '')
       if r.exit_status && rev =~# '^:0'
-        let r = fugitive#Execute([dir, 'write-tree', '--prefix=' . rev[3:-1]])
+        let r = spectregit#git#Execute([dir, 'write-tree', '--prefix=' . rev[3:-1]])
         let sha = get(r.stdout, 0, '')
         let b:fugitive_type = 'tree'
       endif
@@ -78,7 +74,7 @@ function! spectregit#autocmd#BufReadCmd(...) abort
           setlocal bufhidden=delete
         endif
         if rev =~# '^:\d:'
-          let &l:readonly = !filewritable(fugitive#Find('.git/index', dir))
+          let &l:readonly = !filewritable(spectregit#path#Find('.git/index', dir))
           return 'doautocmd BufNewFile'
         else
           setlocal readonly nomodifiable
@@ -144,7 +140,7 @@ function! spectregit#autocmd#BufReadCmd(...) abort
       elseif b:fugitive_type ==# 'stage'
         call s:ReplaceCmd([dir, 'ls-files', '--stage'])
       elseif b:fugitive_type ==# 'blob'
-        let blob_or_filters = rev =~# ':' && fugitive#GitVersion(2, 11) ? '--filters' : 'blob'
+        let blob_or_filters = rev =~# ':' && spectregit#git#GitVersion(2, 11) ? '--filters' : 'blob'
         call s:ReplaceCmd([dir, 'cat-file', blob_or_filters, rev])
       endif
     finally
@@ -154,15 +150,15 @@ function! spectregit#autocmd#BufReadCmd(...) abort
       if modifiable
         let events = ['User FugitiveStageBlob']
       endif
-      let &l:readonly = !modifiable || !filewritable(fugitive#Find('.git/index', dir))
+      let &l:readonly = !modifiable || !filewritable(spectregit#path#Find('.git/index', dir))
       if empty(&bufhidden)
         setlocal bufhidden=delete
       endif
       let &l:modifiable = modifiable
-      call fugitive#MapJumps()
+      call spectregit#maps#MapJumps()
       if b:fugitive_type !=# 'blob'
-        call s:Map('n', 'a', ":<C-U>let b:fugitive_display_format += v:count1<Bar>exe fugitive#BufReadCmd(@%)<CR>", '<silent>')
-        call s:Map('n', 'i', ":<C-U>let b:fugitive_display_format -= v:count1<Bar>exe fugitive#BufReadCmd(@%)<CR>", '<silent>')
+        call s:Map('n', 'a', ":<C-U>let b:fugitive_display_format += v:count1<Bar>exe spectregit#autocmd#BufReadCmd(@%)<CR>", '<silent>')
+        call s:Map('n', 'i', ":<C-U>let b:fugitive_display_format -= v:count1<Bar>exe spectregit#autocmd#BufReadCmd(@%)<CR>", '<silent>')
         setlocal filetype=git
       endif
     endtry

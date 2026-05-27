@@ -59,7 +59,7 @@ function! spectregit#grep#ParseLine(options, quiet, dir, line) abort
   if entry.module !~# ':'
     let entry.filename = spectregit#path#Join(a:options.prefix, entry.module)
   else
-    let entry.filename = fugitive#Find(matchstr(entry.module, '^[^:]*:') .
+    let entry.filename = spectregit#path#Find(matchstr(entry.module, '^[^:]*:') .
           \ substitute(matchstr(entry.module, ':\zs.*'), '/\=:', '/', 'g'), a:dir)
   endif
   return entry
@@ -68,7 +68,7 @@ endfunction
 function! spectregit#grep#Options(args, dir) abort
   let options = {'name_only': 0, 'name_count': 0, 'line_number': 0}
   let tree = spectregit#core#Tree(a:dir)
-  let prefix = empty(tree) ? fugitive#Find(':0:', a:dir) :
+  let prefix = empty(tree) ? spectregit#path#Find(':0:', a:dir) :
         \ spectregit#core#VimSlash(tree . '/')
   let options.prefix = prefix
   for arg in a:args
@@ -87,7 +87,7 @@ function! spectregit#grep#Options(args, dir) abort
       let options.name_only = 1
     endif
     if arg ==# '--cached'
-      let options.prefix = fugitive#Find(':0:', a:dir)
+      let options.prefix = spectregit#path#Find(':0:', a:dir)
     elseif arg ==# '--no-cached'
       let options.prefix = prefix
     endif
@@ -111,7 +111,7 @@ function! spectregit#grep#Cfile(result) abort
   endif
 endfunction
 
-let s:log_diff_context = '{"filename": fugitive#Find(v:val . from, a:dir), "lnum": get(offsets, v:key), "module": strpart(v:val, 0, len(a:state.base_module)) . from}'
+let s:log_diff_context = '{"filename": spectregit#path#Find(v:val . from, a:dir), "lnum": get(offsets, v:key), "module": strpart(v:val, 0, len(a:state.base_module)) . from}'
 
 function! spectregit#grep#LogFlushQueue(state, dir) abort
   let queue = remove(a:state, 'queue')

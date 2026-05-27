@@ -47,7 +47,7 @@ endfunction
 
 function! s:OpenExpand(dir, file, wants_cmd) abort
   if a:file ==# '-'
-    let result = fugitive#Result()
+    let result = spectregit#core#Result()
     if has_key(result, 'file')
       let efile = result.file
     else
@@ -229,7 +229,7 @@ function! spectregit#edit#ReadCommand(line1, count, range, bang, mods, arg, ...)
     return 'echoerr ' . string(v:exception)
   endtry
   if file =~# '^fugitive:' && a:count is# 0
-    return 'exe ' .string('keepalt ' . spectregit#core#Mods(a:mods) . fugitive#FileReadCmd(file, 0, pre)) . '|diffupdate'
+    return 'exe ' .string('keepalt ' . spectregit#core#Mods(a:mods) . spectregit#edit#FileReadCmd(file, 0, pre)) . '|diffupdate'
   endif
   return read . ' ' . pre . ' ' . spectregit#core#fnameescape(file) . post
 endfunction
@@ -246,7 +246,103 @@ function! spectregit#edit#ReadComplete(A, L, P) abort
   return spectregit#edit#Complete(a:A, a:L, a:P)
 endfunction
 
-" Helper functions ported from fugitive.vim
+" ─── Expand helpers (ported from fugitive.vim) ────────────────────────────
+
+if !exists('s:fnameescape')
+  let s:fnameescape = " \t\n*?[{`$\\%#'\"|!<"
+  let s:var = '\%(<\%(cword\|cWORD\|cexpr\|cfile\|sfile\|slnum\|afile\|abuf\|amatch' . (has('clientserver') ? '\|client' : '') . '\)>\|%\|#<\=\d\+\|##\=\)'
+  let s:flag = '\%(:[p8~.htre]\|:g\=s\(.\).\{-\}\1.\{-\}\1\)'
+  let s:expand = '\%(\(' . s:var . '\)\(' . s:flag . '*\)\(:S\)\=\)'
+  let s:commit_expand = '!\\\@!#\=\d*\|!%'
+endif
+
+function! s:BufName(var) abort
+  if a:var ==# '%'
+    return bufname(get(spectregit#core#TempState(), 'origin_bufnr', ''))
+  elseif a:var =~# '^#\d*$'
+    let nr = get(spectregit#core#TempState(+a:var[1:-1]), 'origin_bufnr', '')
+    return bufname(nr ? nr : +a:var[1:-1])
+  else
+    return expand(a:var)
+  endif
+endfunction
+
+function! s:DotRelative(path, ...) abort
+  let cwd = a:0 ? a:1 : getcwd()
+  let path = substitute(a:path, '^[~$]\i*', '\=expand(submatch(0))', '')
+  if len(cwd) && spectregit#core#cpath(cwd . '/', (path . '/')[0 : len(cwd)])
+    return '.' . strpart(path, len(cwd))
+  endif
+  return a:path
+endfunction
+
+function! s:ExpandVar(other, var, flags, esc, ...) abort
+  let cwd = a:0 ? a:1 : getcwd()
+  if a:other =~# '^\'
+    return a:other[1:-1]
+  elseif a:other =~# '^'''
+    return substitute(a:other[1:-2], "''", "'", "g")
+  elseif a:other =~# '^"'
+    return substitute(a:other[1:-2], '""', '"', "g")
+  elseif a:other =~# '^[!`]'
+    let buffer = s:BufName(a:other =~# '[0-9#]' ? '#' . matchstr(a:other, '\d\+') : '%')
+    return '@'
+  elseif a:other =~# '^\~[~.]$'
+    return spectregit#core#Slash(getcwd())
+  elseif len(a:other)
+    return expand(a:other)
+  elseif a:var ==# '<cfile>'
+    let bufnames = [expand('<cfile>')]
+    if get(maparg('<Plug><cfile>', 'c', 0, 1), 'expr')
+      try
+        let bufnames = [eval(maparg('<Plug><cfile>', 'c'))]
+        if bufnames[0] ==# "\<C-R>\<C-F>"
+          let bufnames = [expand('<cfile>')]
+        endif
+      catch
+      endtry
+    endif
+  elseif a:var =~# '^<'
+    let bufnames = [s:BufName(a:var)]
+  elseif a:var ==# '##'
+    let bufnames = map(argv(), 'spectregit#path#Real(v:val)')
+  else
+    let bufnames = [spectregit#path#Real(s:BufName(a:var))]
+  endif
+  let files = []
+  for bufname in bufnames
+    let flags = a:flags
+    let file = s:DotRelative(bufname, cwd)
+    while len(flags)
+      let flag = matchstr(flags, s:flag)
+      let flags = strpart(flags, len(flag))
+      if flag ==# ':.'
+        let file = s:DotRelative(spectregit#path#Real(file), cwd)
+      else
+        let file = fnamemodify(file, flag)
+      endif
+    endwhile
+    let file = spectregit#core#Slash(file)
+    if file =~# '^fugitive://'
+      let [dir, commit, file_candidate] = spectregit#core#DirCommitFile(file)
+      let tree = spectregit#core#Tree(dir)
+      if len(tree) && len(file_candidate)
+        let file = (commit =~# '^.$' ? ':' : '') . commit . ':' .
+              \ s:DotRelative(tree . file_candidate)
+      elseif empty(file_candidate) && commit !~# '^.$'
+        let file = commit
+      endif
+    endif
+    call add(files, len(a:esc) ? shellescape(file) : file)
+  endfor
+  return join(files, "\1")
+endfunction
+
+function! spectregit#edit#Expand(object) abort
+  return substitute(a:object,
+        \ '\(\\[' . s:fnameescape . ']\|^\\[>+-]\|' . s:commit_expand . '\|^\~[~.]\)\|' . s:expand,
+        \ '\=tr(s:ExpandVar(submatch(1),submatch(2),submatch(3),submatch(5)), "\1", " ")', 'g')
+endfunction
 
 function! s:Expand(rev, ...) abort
   let rev = a:rev
@@ -275,11 +371,11 @@ function! s:Expand(rev, ...) abort
   else
     let file = rev
   endif
-  return fugitive#Expand(file)
+  return spectregit#edit#Expand(file)
 endfunction
 
 function! s:ResolveUrl(target, ...) abort
-  return call('fugitive#ResolveUrl', [a:target] + a:000)
+  return [substitute(a:target, '#.*', '', ''), 0]
 endfunction
 
 function! s:FilterEscape(items, ...) abort

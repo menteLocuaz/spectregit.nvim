@@ -4,13 +4,13 @@ let g:autoloaded_spectregit_write = 1
 " Section: :Gwrite, :Gwq
 
 function! s:ChompStderr(...) abort
-  let r = call('fugitive#Execute', a:000)
+  let r = call('spectregit#git#Execute', a:000)
   return !r.exit_status ? '' : len(r.stderr) > 1 ? spectregit#core#JoinChomp(r.stderr) : 'unknown Git error' . string(r)
 endfunction
 
 function! spectregit#write#WriteCommand(line1, line2, range, bang, mods, arg, ...) abort
   exe spectregit#core#VersionCheck()
-  if spectregit#core#cpath(expand('%:p'), fugitive#Find('.git/COMMIT_EDITMSG')) && empty(a:arg)
+  if spectregit#core#cpath(expand('%:p'), spectregit#path#Find('.git/COMMIT_EDITMSG')) && empty(a:arg)
     return (empty($GIT_INDEX_FILE) ? 'write|bdelete' : 'wq') . (a:bang ? '!' : '')
   elseif get(b:, 'fugitive_type', '') ==# 'index' && empty(a:arg)
     return 'Git commit'
@@ -25,7 +25,7 @@ function! spectregit#write#WriteCommand(line1, line2, range, bang, mods, arg, ..
     let after = '|' . remove(args, 0)[1:-1]
   endif
   try
-    let file = len(args) ? spectregit#path#Generate(fugitive#Expand(join(args, ' '))) : fugitive#Real(@%)
+    let file = len(args) ? spectregit#path#Generate(spectregit#edit#Expand(join(args, ' '))) : spectregit#path#Real(@%)
   catch /^fugitive:/
     return 'echoerr ' . string(v:exception)
   endtry
@@ -36,7 +36,7 @@ function! spectregit#write#WriteCommand(line1, line2, range, bang, mods, arg, ..
     return 'write' . (a:bang ? '! ' : ' ') . spectregit#core#fnameescape(file)
   endif
   exe spectregit#core#DirCheck()
-  let always_permitted = spectregit#core#cpath(fugitive#Real(@%), file) && empty(spectregit#core#DirCommitFile(@%)[1])
+  let always_permitted = spectregit#core#cpath(spectregit#path#Real(@%), file) && empty(spectregit#core#DirCommitFile(@%)[1])
   if !always_permitted && !a:bang && (len(spectregit#core#TreeChomp('diff', '--name-status', 'HEAD', '--', file)) || len(spectregit#core#TreeChomp('ls-files', '--others', '--', file)))
     let v:errmsg = 'fugitive: file has uncommitted changes (use ! to override)'
     return 'echoerr v:errmsg'
@@ -88,12 +88,12 @@ function! spectregit#write#WriteCommand(line1, line2, range, bang, mods, arg, ..
     let v:errmsg = 'fugitive: '.message
     return 'echoerr v:errmsg'
   endif
-  if spectregit#core#cpath(fugitive#Real(@%), file) && spectregit#core#DirCommitFile(@%)[1] =~# '^\d$'
+  if spectregit#core#cpath(spectregit#path#Real(@%), file) && spectregit#core#DirCommitFile(@%)[1] =~# '^\d$'
     setlocal nomodified
   endif
-  let one = fugitive#Find(':1:'.file)
-  let two = fugitive#Find(':2:'.file)
-  let three = fugitive#Find(':3:'.file)
+  let one = spectregit#path#Find(':1:'.file)
+  let two = spectregit#path#Find(':2:'.file)
+  let three = spectregit#path#Find(':3:'.file)
   for nr in range(1,bufnr('$'))
     let name = fnamemodify(bufname(nr), ':p')
     if bufloaded(nr) && !getbufvar(nr,'&modified') && (name ==# one || name ==# two || name ==# three)
@@ -101,7 +101,7 @@ function! spectregit#write#WriteCommand(line1, line2, range, bang, mods, arg, ..
     endif
   endfor
   unlet! restorewinnr
-  let zero = fugitive#Find(':0:'.file)
+  let zero = spectregit#path#Find(':0:'.file)
   exe spectregit#core#DoAutocmd('BufWritePost ' . spectregit#core#fnameescape(zero))
   for tab in range(1,tabpagenr('$'))
     for winnr in range(1,tabpagewinnr(tab,'$'))
@@ -131,13 +131,13 @@ function! spectregit#write#WriteCommand(line1, line2, range, bang, mods, arg, ..
       endif
     endfor
   endfor
-  call fugitive#DidChange()
+  call spectregit#status#DidChange()
   return 'checktime' . after
 endfunction
 
 function! spectregit#write#WqCommand(...) abort
   let bang = a:4 ? '!' : ''
-  if spectregit#core#cpath(expand('%:p'), fugitive#Find('.git/COMMIT_EDITMSG'))
+  if spectregit#core#cpath(expand('%:p'), spectregit#path#Find('.git/COMMIT_EDITMSG'))
     return 'wq'.bang
   endif
   let result = call('spectregit#write#WriteCommand', a:000)
