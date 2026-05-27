@@ -172,15 +172,15 @@ function! spectregit#autocmd#BufReadCmd(...) abort
 endfunction
 
 function! spectregit#autocmd#BufWriteCmd(...) abort
-  return ''
+  return call('fugitive#BufWriteCmd', a:000)
 endfunction
 
 function! spectregit#autocmd#FileWriteCmd(...) abort
-  return ''
+  return call('fugitive#FileWriteCmd', a:000)
 endfunction
 
 function! spectregit#autocmd#SourceCmd(...) abort
-  return ''
+  return call('fugitive#SourceCmd', a:000)
 endfunction
 
 function! spectregit#autocmd#TempReadPre(file) abort

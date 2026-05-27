@@ -166,7 +166,7 @@ endfunction
 " ─── Shell / Service helpers (ported from monolith) ──────────────────────────
 
 function! s:winshell() abort
-  return has('win32') && &shellcmdflag !~# '^-'
+  return spectregit#shell#winshell()
 endfunction
 
 function! s:WinShellEsc(arg) abort
@@ -180,15 +180,7 @@ function! s:WinShellEsc(arg) abort
 endfunction
 
 function! s:shellesc(arg) abort
-  if type(a:arg) == type([])
-    return join(map(copy(a:arg), 's:shellesc(v:val)'))
-  elseif a:arg =~# '^[A-Za-z0-9_/:.-]\+$'
-    return a:arg
-  elseif s:winshell()
-    return '"' . spectregit#core#gsub(spectregit#core#gsub(a:arg, '"', '""'), '\%', '"%"') . '"'
-  else
-    return shellescape(a:arg)
-  endif
+  return spectregit#shell#shellesc(a:arg)
 endfunction
 
 function! s:executable(binary) abort
@@ -372,35 +364,7 @@ endfunction
 " ─── SystemError ──────────────────────────────────────────────────────────────
 
 function! s:SystemError(cmd, ...) abort
-  let cmd = type(a:cmd) == type([]) ? s:shellesc(a:cmd) : a:cmd
-  try
-    if &shellredir ==# '>' && &shell =~# 'sh\|cmd'
-      let shellredir = &shellredir
-      if &shell =~# 'csh'
-        set shellredir=>&
-      else
-        set shellredir=>%s\ 2>&1
-      endif
-    endif
-    if exists('+guioptions') && &guioptions =~# '!'
-      let guioptions = &guioptions
-      set guioptions-=!
-    endif
-    let out = call('system', [cmd] + a:000)
-    return [out, v:shell_error]
-  catch /^Vim\%((\a\+)\)\=:E484:/
-    let opts = ['shell', 'shellcmdflag', 'shellredir', 'shellquote', 'shellxquote', 'shellxescape', 'shellslash']
-    call filter(opts, 'exists("+".v:val) && !empty(eval("&".v:val))')
-    call map(opts, 'v:val."=".eval("&".v:val)')
-    throw 'fugitive: failed to run `' . cmd . '` with ' . join(opts, ' ')
-  finally
-    if exists('shellredir')
-      let &shellredir = shellredir
-    endif
-    if exists('guioptions')
-      let &guioptions = guioptions
-    endif
-  endtry
+  return call('spectregit#shell#SystemError', [a:cmd] + a:000)
 endfunction
 
 " ─── PrepareEnv ──────────────────────────────────────────────────────────────
@@ -697,7 +661,10 @@ function! spectregit#git#ShellCommand(...) abort
   return s:BuildShell(spectregit#core#Dir(repo), env, git, flags + args)
 endfunction
 
-
+function! spectregit#git#ClearCaches() abort
+  let s:head_cache = {}
+  let s:git_versions = {}
+endfunction
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

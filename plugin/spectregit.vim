@@ -81,5 +81,5 @@ augroup END
 augroup spectregit_job
   autocmd!
   autocmd BufDelete * call spectregit#autocmd#RunBufDelete(+expand('<abuf>'))
-  autocmd VimLeavePre * call spectregit#core#TempDeleteAll()
+  autocmd VimLeavePre * call spectregit#core#ClearCaches()|call spectregit#core#TempDeleteAll()
 augroup END
