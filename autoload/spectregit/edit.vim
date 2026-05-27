@@ -114,6 +114,20 @@ function! spectregit#edit#DiffClose() abort
   diffoff!
 endfunction
 
+function! spectregit#edit#BlurStatus() abort
+  if (&previewwindow || getwinvar(winnr(), '&winfixbuf') is# 1 || exists('w:fugitive_status')) && get(b:, 'fugitive_type', '') ==# 'index'
+    let winnrs = filter([winnr('#')] + range(1, winnr('$')), 'spectregit#core#UsableWin(v:val)')
+    if len(winnrs)
+      exe winnrs[0].'wincmd w'
+    else
+      belowright new +setl\ bufhidden=delete
+    endif
+    if &diff
+      call spectregit#edit#DiffClose()
+    endif
+  endif
+endfunction
+
 function! s:BlurStatus() abort
   if (&previewwindow || getwinvar(winnr(), '&winfixbuf') is# 1 || exists('w:fugitive_status')) && get(b:, 'fugitive_type', '') ==# 'index'
     let winnrs = filter([winnr('#')] + range(1, winnr('$')), 'spectregit#core#UsableWin(v:val)')

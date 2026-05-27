@@ -1,6 +1,9 @@
 if exists('g:autoloaded_spectregit_config') | finish | endif
 let g:autoloaded_spectregit_config = 1
 
+let s:save_cpo = &cpo
+set cpo&vim
+
 let s:config_prototype = {}
 let s:config = {}
 
@@ -8,7 +11,7 @@ function! s:ConfigTimestamps(dir, dict) abort
   let files = ['/etc/gitconfig', '~/.gitconfig',
         \ len($XDG_CONFIG_HOME) ? $XDG_CONFIG_HOME . '/git/config' : '~/.config/git/config']
   if len(a:dir)
-    call add(files, FugitiveFind('.git/config', a:dir))
+    call add(files, spectregit#path#Find('.git/config', a:dir))
   endif
   call extend(files, get(a:dict, 'include.path', []))
   return join(map(files, 'getftime(expand(v:val))'), ',')
@@ -84,7 +87,7 @@ function! spectregit#config#Config(...) abort
     let dir = spectregit#core#Dir()
   endif
   let name = substitute(name, '^[^.]\+\|[^.]\+$', '\L&', 'g')
-  let git_dir = call('FugitiveGitDir', [dir])
+  let git_dir = spectregit#core#Dir(dir)
   let dir_key = len(git_dir) ? git_dir : '_'
   let [ts, dict] = get(s:config, dir_key, ['new', {}])
   if !has_key(dict, 'job') && ts !=# s:ConfigTimestamps(git_dir, dict)
@@ -92,14 +95,14 @@ function! spectregit#config#Config(...) abort
     let dict.git_dir = git_dir
     let into = ['running', dict]
     let dict.callbacks = []
-    let exec = fugitive#Execute([dir, 'config', '--list', '-z', '--'], function('s:ConfigCallback'), into)
+    let exec = spectregit#git#Execute([dir, 'config', '--list', '-z', '--'], function('s:ConfigCallback'), into)
     if has_key(exec, 'job')
       let dict.job = exec.job
     endif
     let s:config[dir_key] = into
   endif
   if !exists('l:callback')
-    call fugitive#Wait(dict)
+    call spectregit#git#Wait(dict)
   elseif has_key(dict, 'callbacks')
     call add(dict.callbacks, callback)
   else
@@ -117,7 +120,7 @@ function! spectregit#config#ConfigGetAll(name, ...) abort
     let name = a:name
   endif
   let name = substitute(name, '^[^.]\+\|[^.]\+$', '\L&', 'g')
-  call fugitive#Wait(config)
+  call spectregit#git#Wait(config)
   return name =~# '\.' ? copy(get(config, name, [])) : []
 endfunction
 
@@ -129,7 +132,7 @@ function! spectregit#config#ConfigGetRegexp(pattern, ...) abort
     let config = spectregit#config#Config(a:0 ? a:1 : spectregit#core#Dir())
     let pattern = a:pattern
   endif
-  call fugitive#Wait(config)
+  call spectregit#git#Wait(config)
   let filtered = map(filter(copy(config), 'v:key =~# "\\." && v:key =~# pattern'), 'copy(v:val)')
   if pattern !~# '\\\@<!\%(\\\\\)*\\z[se]'
     return filtered
@@ -146,7 +149,7 @@ endfunction
 
 function! s:config_GetAll(name) dict abort
   let name = substitute(a:name, '^[^.]\+\|[^.]\+$', '\L&', 'g')
-  call fugitive#Wait(self)
+  call spectregit#git#Wait(self)
   return name =~# '\.' ? copy(get(self, name, [])) : []
 endfunction
 
@@ -172,12 +175,12 @@ function! spectregit#config#RemoteUrl(...) abort
 endfunction
 
 function! s:RemoteDefault(dir) abort
-  let head = FugitiveHead(0, a:dir)
-  let remote = len(head) ? FugitiveConfigGet('branch.' . head . '.remote', a:dir) : ''
+  let head = spectregit#git#Head(0, a:dir)
+  let remote = len(head) ? spectregit#config#Config('branch.' . head . '.remote', a:dir) : ''
   let i = 10
   while remote ==# '.' && i > 0
-    let head = matchstr(FugitiveConfigGet('branch.' . head . '.merge', a:dir), 'refs/heads/\zs.*')
-    let remote = len(head) ? FugitiveConfigGet('branch.' . head . '.remote', a:dir) : ''
+    let head = matchstr(spectregit#config#Config('branch.' . head . '.merge', a:dir), 'refs/heads/\zs.*')
+    let remote = len(head) ? spectregit#config#Config('branch.' . head . '.remote', a:dir) : ''
     let i -= 1
   endwhile
   return remote =~# '^\.\=$' ? 'origin' : remote
@@ -186,15 +189,15 @@ endfunction
 function! s:UrlParse(url) abort
   let scp_authority = matchstr(a:url, '^[^:/]\+\ze:\%(//\)\@!')
   if len(scp_authority) && !(has('win32') && scp_authority =~# '^\a:[\/]')
-    let url = {'scheme': 'ssh', 'authority': fugitive#UrlEncode(scp_authority), 'hash': '',
-          \ 'path': fugitive#UrlEncode(strpart(a:url, len(scp_authority) + 1))}
+    let url = {'scheme': 'ssh', 'authority': spectregit#core#UrlEncode(scp_authority), 'hash': '',
+          \ 'path': spectregit#core#UrlEncode(strpart(a:url, len(scp_authority) + 1))}
   elseif empty(a:url)
     let url = {'scheme': '', 'authority': '', 'path': '', 'hash': ''}
   else
     let match = matchlist(a:url, '^\([[:alnum:].+-]\+\)://\([^/]*\)\(/[^#]*\)\=\(#.*\)\=$')
     if empty(match)
       let url = {'scheme': 'file', 'authority': '', 'hash': '',
-            \ 'path': fugitive#UrlEncode(a:url)}
+            \ 'path': spectregit#core#UrlEncode(a:url)}
     else
       let url = {'scheme': match[1], 'authority': match[2], 'hash': match[4]}
       let url.path = empty(match[3]) ? '/' : match[3]
@@ -206,7 +209,7 @@ endfunction
 function! s:UrlPopulate(string, into) abort
   let url = a:into
   let url.protocol = substitute(url.scheme, '.\zs$', ':', '')
-  let url.user = fugitive#UrlDecode(matchstr(url.authority, '.\{-\}\ze@', '', ''))
+  let url.user = spectregit#core#UrlDecode(matchstr(url.authority, '.\{-\}\ze@', '', ''))
   let url.host = substitute(url.authority, '.\{-\}@', '', '')
   let url.hostname = substitute(url.host, ':\d\+$', '', '')
   let url.port = matchstr(url.host, ':\zs\d\+$', '', '')
@@ -225,12 +228,76 @@ function! s:UrlPopulate(string, into) abort
   else
     let url.href = a:string
   endif
-  let url.path = fugitive#UrlDecode(matchstr(url.path, '^[^?]*'))
+  let url.path = spectregit#core#UrlDecode(matchstr(url.path, '^[^?]*'))
   let url.url = matchstr(url.href, '^[^#]*')
 endfunction
 
 function! s:ConfigLengthSort(i1, i2) abort
   return len(a:i2[0]) - len(a:i1[0])
+endfunction
+
+let s:remote_headers = {}
+
+function! spectregit#config#RemoteHttpHeaders(remote) abort
+  let remote = type(a:remote) ==# type({}) ? get(a:remote, 'remote', '') : a:remote
+  if type(remote) !=# type('') || remote !~# '^https\=://.' || !executable('curl')
+    return {}
+  endif
+  let remote = substitute(remote, '#.*', '', '')
+  if !has_key(s:remote_headers, remote)
+    let url = remote . '/info/refs?service=git-upload-pack'
+    let exec = spectregit#git#Execute(
+          \ ['curl', '--disable', '--silent', '--max-time', '5', '-X', 'GET', '-I',
+          \ url], {}, [], [function('s:CurlResponse')], {})
+    call spectregit#git#Wait(exec)
+    let s:remote_headers[remote] = exec.headers
+  endif
+  return s:remote_headers[remote]
+endfunction
+
+function! s:CurlResponse(result) abort
+  let a:result.headers = {}
+  for line in a:result.exit_status ? [] : remove(a:result, 'stdout')
+    let header = matchlist(line, '^\([[:alnum:]-]\+\):\s\(.\{-\}\)'. "\r\\=$")
+    if len(header)
+      let k = tolower(header[1])
+      if has_key(a:result.headers, k)
+        let a:result.headers[k] .= ', ' . header[2]
+      else
+        let a:result.headers[k] = header[2]
+      endif
+    elseif empty(line)
+      break
+    endif
+  endfor
+endfunction
+
+function! spectregit#config#SshHostAlias(authority) abort
+  let [_, user, host, port; __] = matchlist(a:authority, '^\%(\([^/@]\+\)@\)\=\(.\{-\}\)\%(:\(\d\+\)\)\=$')
+  let c = spectregit#config#SshConfig(host, ['user', 'hostname', 'port'])
+  if empty(user)
+    let user = get(c, 'user', '')
+  endif
+  if empty(port)
+    let port = get(c, 'port', '')
+  endif
+  return (len(user) ? user . '@' : '') . get(c, 'hostname', host) . (port =~# '^\%(22\)\=$' ? '' : ':' . port)
+endfunction
+
+function! spectregit#config#RemoteResolve(url, flags) abort
+  let remote = s:UrlParse(a:url)
+  if remote.scheme =~# '^https\=$' && index(a:flags, ':nohttp') < 0
+    let headers = spectregit#config#RemoteHttpHeaders(a:url)
+    let loc = matchstr(get(headers, 'location', ''), '^https\=://.\{-\}\ze/info/refs?')
+    if len(loc)
+      let remote = s:UrlParse(loc)
+    else
+      let remote.headers = headers
+    endif
+  elseif remote.scheme ==# 'ssh'
+    let remote.authority = spectregit#config#SshHostAlias(remote.authority)
+  endif
+  return remote
 endfunction
 
 function! s:RemoteCallback(config, into, flags, cb) abort
@@ -239,9 +306,9 @@ function! s:RemoteCallback(config, into, flags, cb) abort
   endif
   let url = a:into.remote_name
   if url ==# '.git'
-    let url = call('FugitiveGitDir', [a:config])
+    let url = spectregit#core#Dir(a:config)
   elseif url !~# ':\|^/\|^\a:[\/]\|^\.\.\=/'
-    let url = FugitiveConfigGet('remote.' . url . '.url', a:config)
+    let url = spectregit#config#Config('remote.' . url . '.url', a:config)
   endif
   let instead_of = []
   for [k, vs] in items(spectregit#config#ConfigGetRegexp('^url\.\zs.\{-\}\ze\.insteadof$', a:config))
@@ -257,7 +324,7 @@ function! s:RemoteCallback(config, into, flags, cb) abort
     endif
   endfor
   if index(a:flags, ':noresolve') < 0
-    call extend(a:into, fugitive#RemoteResolve(url, a:flags))
+    call extend(a:into, spectregit#config#RemoteResolve(url, a:flags))
   else
     call extend(a:into, s:UrlParse(url))
   endif
@@ -307,12 +374,12 @@ function! s:RemoteParseArgs(args) abort
 endfunction
 
 function! s:Remote(dir, remote, flags, cb) abort
-  let into = {'remote_name': a:remote, 'git_dir': call('FugitiveGitDir', [a:dir])}
+  let into = {'remote_name': a:remote, 'git_dir': spectregit#core#Dir(a:dir)}
   let config = spectregit#config#Config(a:dir, function('s:RemoteCallback'), into, a:flags, a:cb)
   if len(a:cb)
     return config
   else
-    call fugitive#Wait(config)
+    call spectregit#git#Wait(config)
     return into
   endif
 endfunction
@@ -385,4 +452,5 @@ function! s:SshParseHost(value) abort
   return '^\%(' . join(patterns, '\|') . '\)$' . join(negates, '')
 endfunction
 
-
+let &cpo = s:save_cpo
+unlet s:save_cpo

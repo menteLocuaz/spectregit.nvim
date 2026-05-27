@@ -31,9 +31,7 @@ function! s:QuickfixOpen(nr, mods) abort
 endfunction
 
 function! spectregit#quickfix#Stream(nr, event, title, cmd, first, mods, callback, ...) abort
-  " BlurStatus is currently internal to fugitive or we need to port it.
-  " Assuming we might need it for status buffer interactions.
-  " call s:BlurStatus() 
+  call spectregit#edit#BlurStatus()
 
   let opts = {'title': a:title, 'context': {'items': []}}
   call s:QuickfixCreate(a:nr, opts)
@@ -48,7 +46,8 @@ function! spectregit#quickfix#Stream(nr, event, title, cmd, first, mods, callbac
   let buffer = []
   " SystemList needs to be ported or used from fugitive if public.
   " Fugitive's s:SystemList is internal.
-  let lines = fugitive#Execute(a:cmd).stdout 
+  let result = spectregit#git#Execute(a:cmd)
+  let lines = result.stdout
   for line in lines
     call extend(buffer, call(a:callback, a:000 + [line]))
     if len(buffer) >= 20
@@ -62,6 +61,9 @@ function! spectregit#quickfix#Stream(nr, event, title, cmd, first, mods, callbac
       endif
     endif
   endfor
+  if result.exit_status != 0
+    call extend(buffer, [{'text': 'Git Error: ' . join(result.stderr, "\n"), 'valid': 0}])
+  endif
   call extend(buffer, call(a:callback, a:000 + [0]))
   call extend(opts.context.items, map(copy(buffer), 'get(v:val, "context", {})'))
   lockvar opts.context.items

@@ -21,7 +21,7 @@ function! s:repo_dir(...) dict abort
   if !a:0
     return self.git_dir
   endif
-  throw 'fugitive: spectregit#repo#Get().dir("...") has been replaced by FugitiveFind(".git/...")'
+  throw 'fugitive: spectregit#repo#Get().dir("...") has been replaced by spectregit#path#Find(".git/...")'
 endfunction
 
 function! s:repo_tree(...) dict abort
@@ -31,33 +31,33 @@ function! s:repo_tree(...) dict abort
   elseif !a:0
     return tree
   endif
-  throw 'fugitive: spectregit#repo#Get().tree("...") has been replaced by FugitiveFind(":(top)...")'
+  throw 'fugitive: spectregit#repo#Get().tree("...") has been replaced by spectregit#path#Find(":(top)...")'
 endfunction
 
 function! s:repo_bare() dict abort
-  throw 'fugitive: fugitive#repo().bare() has been replaced by !empty(FugitiveWorkTree())'
+  throw 'fugitive: fugitive#repo().bare() has been replaced by !empty(spectregit#core#Tree())'
 endfunction
 
 function! s:repo_find(object) dict abort
-  throw 'fugitive: fugitive#repo().find(...) has been replaced by FugitiveFind(...)'
+  return spectregit#path#Find(a:object, self.git_dir)
 endfunction
 
 function! s:repo_translate(rev) dict abort
-  throw 'fugitive: fugitive#repo().translate(...) has been replaced by FugitiveFind(...)'
+  throw 'fugitive: fugitive#repo().translate(...) has been replaced by spectregit#path#Find(...)'
 endfunction
 
 function! s:repo_head(...) dict abort
-  throw 'fugitive: fugitive#repo().head(...) has been replaced by FugitiveHead(...)'
+  return spectregit#git#Head(a:0 ? a:1 : 0, self.git_dir)
 endfunction
 
 call s:add_methods('repo', ['dir', 'tree', 'bare', 'find', 'translate', 'head'])
 
 function! s:repo_git_command(...) dict abort
-  throw 'fugitive: spectregit#repo#Get().git_command(...) has been replaced by FugitiveShellCommand(...)'
+  return spectregit#git#ShellCommand(a:000, self.git_dir)
 endfunction
 
 function! s:repo_git_chomp(...) dict abort
-  silent return substitute(system(FugitiveShellCommand(a:000, self.git_dir)), '\n$', '', '')
+  silent return substitute(system(spectregit#git#ShellCommand(a:000, self.git_dir)), '\n$', '', '')
 endfunction
 
 function! s:repo_git_chomp_in_tree(...) dict abort
@@ -65,13 +65,13 @@ function! s:repo_git_chomp_in_tree(...) dict abort
 endfunction
 
 function! s:repo_rev_parse(rev) dict abort
-  throw 'fugitive: spectregit#repo#Get().rev_parse(...) has been replaced by FugitiveExecute("rev-parse", "--verify", ...).stdout'
+  throw 'fugitive: spectregit#repo#Get().rev_parse(...) has been replaced by spectregit#git#Execute("rev-parse", "--verify", ...).stdout'
 endfunction
 
 call s:add_methods('repo', ['git_command', 'git_chomp', 'git_chomp_in_tree', 'rev_parse'])
 
 function! s:repo_config(name) dict abort
-  return FugitiveConfigGet(a:name, self.git_dir)
+  return spectregit#config#Config(a:name, self.git_dir)
 endfunction
 
 call s:add_methods('repo', ['config'])
