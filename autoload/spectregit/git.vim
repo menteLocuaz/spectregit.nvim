@@ -1,6 +1,9 @@
 if exists('g:autoloaded_spectregit_git') | finish | endif
 let g:autoloaded_spectregit_git = 1
 
+let s:save_cpo = &cpo
+set cpo&vim
+
 let s:run_jobs = (exists('*ch_close_in') || exists('*jobstart')) && exists('*bufwinid')
 let s:git_versions = {}
 let s:temp_scripts = {}
@@ -57,7 +60,7 @@ function! s:TempScript(...) abort
   if !filereadable(temp)
     call writefile(['#!/bin/sh'] + a:000, temp)
   endif
-  let temp = FugitiveGitPath(temp)
+  let temp = spectregit#core#Slash(temp)
   if temp =~# '\s'
     let temp = '"' . temp . '"'
   endif
@@ -120,7 +123,7 @@ function! spectregit#git#Head(...) abort
   if empty(dir)
     return ''
   endif
-  let file = FugitiveActualDir(dir) . '/HEAD'
+  let file = spectregit#path#Find('.git/HEAD', dir)
   let ftime = getftime(file)
   if ftime == -1
     return ''
@@ -147,7 +150,7 @@ function! spectregit#git#CompleteHeads(dir) abort
   if empty(a:dir)
     return []
   endif
-  let dir = FugitiveFind('.git/', a:dir)
+  let dir = spectregit#path#Find('.git/', a:dir)
   return sort(filter(['HEAD', 'FETCH_HEAD', 'ORIG_HEAD'] + s:merge_heads, 'filereadable(dir . v:val)')) +
         \ sort(spectregit#core#LinesError([a:dir, 'rev-parse', '--symbolic', '--branches', '--tags', '--remotes'])[0])
 endfunction
@@ -228,7 +231,7 @@ function! s:GitCmd() abort
 endfunction
 
 function! s:UserCommandCwd(dir) abort
-  let tree = FugitiveWorkTree(a:dir)
+  let tree = spectregit#core#Tree(a:dir)
   return len(tree) ? spectregit#core#VimSlash(tree) : getcwd()
 endfunction
 
@@ -403,11 +406,11 @@ endfunction
 " ─── PrepareEnv ──────────────────────────────────────────────────────────────
 
 function! s:PrepareEnv(env, dir) abort
-  if len($GIT_INDEX_FILE) && len(FugitiveWorkTree(a:dir)) && !has_key(a:env, 'GIT_INDEX_FILE')
+  if len($GIT_INDEX_FILE) && len(spectregit#core#Tree(a:dir)) && !has_key(a:env, 'GIT_INDEX_FILE')
     let index_dir = substitute(spectregit#core#GitIndexFileEnv(), '[^/]\+$', '', '')
-    let our_dir = FugitiveFind('.git/', a:dir)
+    let our_dir = spectregit#path#Find('.git/', a:dir)
     if !spectregit#core#cpath(index_dir, our_dir) && !spectregit#core#cpath(resolve(index_dir), our_dir)
-      let a:env['GIT_INDEX_FILE'] = FugitiveGitPath(FugitiveFind('.git/index', a:dir))
+      let a:env['GIT_INDEX_FILE'] = spectregit#core#Slash(spectregit#path#Find('.git/index', a:dir))
     endif
   endif
   if len($GIT_WORK_TREE)
@@ -427,7 +430,7 @@ function! s:PreparePathArgs(cmd, dir, literal, explicit) abort
         if a:literal
           let a:cmd[i] = spectregit#path#Real(bufname(a:cmd[i]))
         else
-          let a:cmd[i] = fugitive#Path(bufname(a:cmd[i]), ':(top,literal)', a:dir)
+          let a:cmd[i] = spectregit#path#Path(bufname(a:cmd[i]), ':(top,literal)', a:dir)
         endif
       endif
   endfor
@@ -439,10 +442,10 @@ function! s:PreparePathArgs(cmd, dir, literal, explicit) abort
       if a:literal
         let a:cmd[i] = spectregit#path#Real(bufname(a:cmd[i]))
       else
-        let a:cmd[i] = fugitive#Path(bufname(a:cmd[i]), ':(top,literal)', a:dir)
+        let a:cmd[i] = spectregit#path#Path(bufname(a:cmd[i]), ':(top,literal)', a:dir)
       endif
     elseif !a:explicit
-      let a:cmd[i] = fugitive#Path(a:cmd[i], './', a:dir)
+      let a:cmd[i] = spectregit#path#Path(a:cmd[i], './', a:dir)
     endif
   endfor
   return a:cmd
@@ -468,14 +471,14 @@ endfunction
 
 function! s:BuildShell(dir, env, git, args) abort
   let cmd = copy(a:args)
-  let tree = FugitiveWorkTree(a:dir)
+  let tree = spectregit#core#Tree(a:dir)
   let pre = s:BuildEnvPrefix(a:env)
   if empty(tree) || index(cmd, '--') == len(cmd) - 1
-    call insert(cmd, '--git-dir=' . FugitiveGitPath(a:dir))
+    call insert(cmd, '--git-dir=' . spectregit#core#Slash(a:dir))
   else
-    call extend(cmd, ['-C', FugitiveGitPath(tree)], 'keep')
+    call extend(cmd, ['-C', spectregit#core#Slash(tree)], 'keep')
     if !spectregit#core#cpath(tree . '/.git', a:dir) || len($GIT_DIR)
-      call extend(cmd, ['--git-dir=' . FugitiveGitPath(a:dir)], 'keep')
+      call extend(cmd, ['--git-dir=' . spectregit#core#Slash(a:dir)], 'keep')
     endif
   endif
   return pre . join(map(a:git + cmd, 's:shellesc(v:val)'))
@@ -486,9 +489,7 @@ endfunction
 function! s:JobOpts(cmd, env) abort
   if empty(a:env)
     return [a:cmd, {}]
-  elseif has('patch-8.2.0239') ||
-        \ has('nvim') && api_info().version.api_level - api_info().version.api_prerelease >= 7 ||
-        \ has('patch-8.0.0902') && !has('nvim') && (!has('win32') || empty(filter(keys(a:env), 'exists("$" . v:val)')))
+  elseif has('patch-8.2.0239') || has('nvim') && api_info().version.api_level - api_info().version.api_prerelease >= 7 || has('patch-8.0.0902') && !has('nvim') && (!has('win32') || empty(filter(keys(a:env), 'exists("$" . v:val)')))
     return [a:cmd, {'env': a:env}]
   endif
   let envlist = map(items(a:env), 'join(v:val, "=")')
@@ -513,7 +514,7 @@ function! spectregit#git#PrepareDirEnvGitFlagsArgs(...) abort
   let git = s:GitCmd()
   if a:0 == 1 && type(a:1) == type({}) && (has_key(a:1, 'fugitive_dir') || has_key(a:1, 'git_dir')) && has_key(a:1, 'flags') && has_key(a:1, 'args')
     let cmd = a:1.flags + a:1.args
-    let dir = FugitiveGitDir(a:1)
+    let dir = spectregit#core#Dir(a:1)
     if has_key(a:1, 'git')
       let git = a:1.git
     endif
@@ -539,7 +540,7 @@ function! spectregit#git#PrepareDirEnvGitFlagsArgs(...) abort
   while i < len(cmd)
     if type(cmd[i]) == type({})
       if has_key(cmd[i], 'fugitive_dir') || has_key(cmd[i], 'git_dir')
-        let dir = FugitiveGitDir(cmd[i])
+        let dir = spectregit#core#Dir(cmd[i])
       endif
       if has_key(cmd[i], 'git')
         let git = cmd[i].git
@@ -549,11 +550,11 @@ function! spectregit#git#PrepareDirEnvGitFlagsArgs(...) abort
       endif
       call remove(cmd, i)
     elseif cmd[i] =~# '^$\|[\/.]' && cmd[i] !~# '^-'
-      let dir = FugitiveGitDir(remove(cmd, i))
+      let dir = spectregit#core#Dir(remove(cmd, i))
     elseif cmd[i] =~# '^--git-dir='
-      let dir = FugitiveGitDir(remove(cmd, i)[10:-1])
+      let dir = spectregit#core#Dir(remove(cmd, i)[10:-1])
     elseif type(cmd[i]) == type(0)
-      let dir = FugitiveGitDir(remove(cmd, i))
+      let dir = spectregit#core#Dir(remove(cmd, i))
     elseif cmd[i] ==# '-c' && len(cmd) > i + 1
       let key = matchstr(cmd[i+1], '^[^=]*')
       if has_key(s:prepare_env, tolower(key))
@@ -574,7 +575,7 @@ function! spectregit#git#PrepareDirEnvGitFlagsArgs(...) abort
     endif
   endwhile
   if !exists('dir')
-    let dir = FugitiveGitDir()
+    let dir = spectregit#core#Dir()
   endif
   call extend(autoenv, env)
   call s:PrepareEnv(autoenv, dir)
@@ -609,21 +610,21 @@ function! spectregit#git#PrepareJob(...) abort
     return s:PrepareJob(a:1)
   endif
   let [repo, user_env, exec_env, git, flags, args] = call('spectregit#git#PrepareDirEnvGitFlagsArgs', a:000)
-  let dir = FugitiveGitDir(repo)
+  let dir = spectregit#core#Dir(repo)
   let dict = {'git': git, 'git_dir': dir, 'flags': flags, 'args': args}
   if len(user_env)
     let dict.env = user_env
   endif
   let cmd = flags + args
-  let tree = FugitiveWorkTree(repo)
+  let tree = spectregit#core#Tree(repo)
   if empty(tree) || index(cmd, '--') == len(cmd) - 1
     let dict.cwd = getcwd()
-    call extend(cmd, ['--git-dir=' . FugitiveGitPath(dir)], 'keep')
+    call extend(cmd, ['--git-dir=' . spectregit#core#Slash(dir)], 'keep')
   else
     let dict.cwd = spectregit#core#VimSlash(tree)
-    call extend(cmd, ['-C', FugitiveGitPath(tree)], 'keep')
+    call extend(cmd, ['-C', spectregit#core#Slash(tree)], 'keep')
     if !spectregit#core#cpath(tree . '/.git', dir) || len($GIT_DIR)
-      call extend(cmd, ['--git-dir=' . FugitiveGitPath(dir)], 'keep')
+      call extend(cmd, ['--git-dir=' . spectregit#core#Slash(dir)], 'keep')
     endif
   endif
   call extend(cmd, git, 'keep')
@@ -647,8 +648,8 @@ function! spectregit#git#PagerFor(argv, ...) abort
         \   !spectregit#core#HasOpt(args, '--contains', '--no-contains', '--merged', '--no-merged', '--points-at'))
     return 0
   endif
-  let config = a:0 ? a:1 : fugitive#Config()
-  let value = get(fugitive#ConfigGetAll('pager.' . args[0], config), 0, -1)
+  let config = a:0 ? a:1 : spectregit#config#Config()
+  let value = get(spectregit#config#ConfigGetAll('pager.' . args[0], config), 0, -1)
   if value =~# '^\%(true\|yes\|on\|1\)$'
     return 1
   elseif value =~# '^\%(false\|no|off\|0\|\)$'
@@ -693,7 +694,10 @@ endfunction
 
 function! spectregit#git#ShellCommand(...) abort
   let [repo, _, env, git, flags, args] = call('spectregit#git#PrepareDirEnvGitFlagsArgs', a:000)
-  return s:BuildShell(FugitiveGitDir(repo), env, git, flags + args)
+  return s:BuildShell(spectregit#core#Dir(repo), env, git, flags + args)
 endfunction
 
 
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
