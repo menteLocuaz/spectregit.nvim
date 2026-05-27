@@ -1,3 +1,16 @@
-[themis]
-target = "test"
-recursive = 1
+call themis#option('recursive', 1)
+runtime! plugin/fugitive.vim
+runtime! plugin/spectregit.vim
+
+source test/helper.vim
+
+" Preload all spectregit autoload modules so exists('*spectregit#*') works
+for s:mod in ['core', 'complete', 'write', 'diff', 'branch', 'edit', 'blame',
+      \ 'browse', 'cd', 'quickfix', 'config', 'repo', 'fold', 'statusline',
+      \ 'status', 'path', 'git', 'maps', 'autocmd']
+  try
+    exe 'runtime! autoload/spectregit/' . s:mod . '.vim'
+  catch
+  endtry
+endfor
+unlet s:mod

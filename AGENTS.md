@@ -29,6 +29,12 @@ autoload/spectregit/
 └── autocmd.vim               spectregit#autocmd#BufReadCmd(), BufWriteCmd(), FileWriteCmd(), SourceCmd()
 ```
 
+```
+autoload/spectregit/
+├── shell.vim                 spectregit#shell#winshell(), #shellesc(), #SystemError() — shared
+├── compat.vim                Wrappers for Fugitive* globals, replaced as modules are ported
+```
+
 Not yet built: `edit.vim`, `write.vim`, `diff.vim`, `grep.vim`, `blame.vim`, `browse.vim`, `status.vim`, `maps.vim`.
 
 ## Naming convention
@@ -85,6 +91,21 @@ The test script handles `set rtp+=...`, `runtime! plugin/**/*.vim`, setup, and `
 
 **Important**: `exists('*spectregit#module#Func')` does NOT trigger Vim autoload.
 Call the function first to trigger autoload, then check existence.
+
+## Error strategy
+
+Use the right error convention for the context:
+
+1. **Internal helpers** → `throw 'fugitive: ...'` with `call spectregit#core#Throw(...)`.  
+   Callers at the public API boundary catch these.
+2. **Public API called via `:exe`** (autocmds, commands) → return Ex command strings.  
+   Errors: `return 'echoerr ' . string(v:exception)`  
+   Success: `return 'doautocmd ...'` or `return ''`
+3. **Data-retrieval functions** (e.g., `ChompDefault`, `LinesError`) → return empty/default
+   on failure. The caller decides how to surface the error.
+4. **Never mix within a single function.** If a function is called both internally
+   and from an autocmd, have the implementation throw and let a thin public wrapper
+   catch and convert to `'echoerr ...'`.
 
 ## Known gotchas
 

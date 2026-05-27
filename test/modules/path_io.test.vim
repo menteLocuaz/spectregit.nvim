@@ -30,7 +30,7 @@ endfunction
 function! s:suite.test_getftime() abort
   let url = 'fugitive://' . self.git_dir . '//' . self.head . '/test.txt'
   let ftime = spectregit#path#getftime(url)
-  call s:assert.type_number(ftime)
+  call s:assert.type_of(ftime, 'number')
   call s:assert.true(ftime > 0)
 endfunction
 

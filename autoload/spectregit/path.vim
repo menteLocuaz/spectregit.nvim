@@ -482,5 +482,10 @@ function! spectregit#path#delete(url, ...) abort
   return -1
 endfunction
 
+function! spectregit#path#ClearCaches() abort
+  let s:trees = {}
+  let s:indexes = {}
+endfunction
+
 let &cpo = s:save_cpo
 unlet s:save_cpo

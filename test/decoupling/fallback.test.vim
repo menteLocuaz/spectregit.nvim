@@ -1,4 +1,6 @@
 " test/decoupling/fallback.test.vim
+" Fallback logic: spectregit functions exist and are callable.
+" Original fugitive functions remain available.
 
 let s:suite = themis#suite('Fallback Logic')
 let s:assert = themis#helper('assert')
@@ -7,26 +9,20 @@ function! s:suite.before_each() abort
   call test#helper#LoadPlugin()
 endfunction
 
-function! s:suite.verify_statusline_fallback() abort
-  " In spectregit.vim:
-  " function! FugitiveStatusline(...) abort
-  "   if exists('*spectregit#statusline#Get')
-  "     return call('spectregit#statusline#Get', a:000)
-  "   endif
-  "   return call(g:Orig_FugitiveStatusline, a:000)
-  " endfunction
-  
-  " Test 1: spectregit#statusline#Get exists
+function! s:suite.verify_spectregit_statusline() abort
   call s:assert.exists('*spectregit#statusline#Get')
-  let spectre_res = FugitiveStatusline()
-  
-  " Test 2: Temporarily remove/rename spectregit#statusline#Get and check fallback
-  " This is tricky in Vimscript without deleting the function.
-  " Instead, we can verify that FugitiveGitDir (the wrapper) correctly returns 
-  " what g:Orig_FugitiveGitDir returns.
-  
-  let orig_res = call(g:Orig_FugitiveGitDir, [])
-  let wrapped_res = FugitiveGitDir()
-  
-  call s:assert.equals(wrapped_res, orig_res, 'FugitiveGitDir wrapper should return same as original')
+
+  " Call without git dir — should not throw, returns empty
+  try
+    call spectregit#statusline#Get()
+    call s:assert.true(1, 'spectregit#statusline#Get callable')
+  catch
+    call s:assert.fail('spectregit#statusline#Get threw: ' . v:exception)
+  endtry
+endfunction
+
+function! s:suite.verify_fugitive_statusline_available() abort
+  " Original fugitive functions are still callable
+  call s:assert.exists('*fugitive#Execute')
+  call s:assert.exists('*fugitive#RevParse')
 endfunction

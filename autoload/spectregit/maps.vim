@@ -519,6 +519,10 @@ endfunction
 
 " ─── Public API ─────────────────────────────────────────────────────
 
+function! spectregit#maps#StageInfo(...) abort
+  return call('s:StageInfo', a:000)
+endfunction
+
 function! spectregit#maps#MapCfile(...) abort
   exe 'cnoremap <buffer> <expr> <Plug><cfile>' (a:0 ? a:1 : 'spectregit#maps#Cfile()')
   let b:undo_ftplugin = get(b:, 'undo_ftplugin', 'exe') . '|sil! exe "cunmap <buffer> <Plug><cfile>"'

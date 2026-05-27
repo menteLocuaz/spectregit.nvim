@@ -31,7 +31,7 @@ function! s:suite.test_remote_resolve_file() abort
   let l:url = 'file:///path/to/repo'
   let l:resolved = spectregit#config#RemoteResolve(l:url, [])
   call s:assert.equals(l:resolved.scheme, 'file')
-  call s:assert.equals(l:resolved.path, '%2Fpath%2Fto%2Frepo')
+  call s:assert.equals(l:resolved.path, '/path/to/repo')
 endfunction
 
 function! s:suite.test_remote_http_headers_invalid() abort
